@@ -827,7 +827,7 @@ main{position:relative;min-width:0;min-height:0}
     <div class="head">
       <div class="toprow"><div class="eyebrow">Información referencial · oct. 2026</div><button class="ayuda-btn" id="ayuda-btn" aria-haspopup="dialog">Cómo usar</button></div>
       <h1>Transporte rural Región Metropolitana</h1>
-      <p class="sub">Recorridos de buses rurales y subsidiados. Toca el mapa o busca tu localidad para ver el servicio más cercano.</p>
+      <p class="sub">Recorridos de buses rurales, regulados y subsidiados. Toca el mapa o busca tu localidad para ver el servicio más cercano.</p>
       <div class="search"><input id="q" type="search" placeholder="Buscar servicio, operador, comuna o localidad" aria-label="Buscar servicio, operador, comuna o localidad" autocomplete="off"></div>
     </div>
     <div class="list" id="list"><div class="empty" id="cargando">Cargando recorridos…</div></div>
@@ -870,7 +870,7 @@ main{position:relative;min-width:0;min-height:0}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
 (async function(){
-const CATMAP={'Rural corriente':'rc','Rural periférico':'rp','CTA':'cta','CTR':'ctr','CTE':'cte'};
+const CATMAP={'Rural corriente':'rc','Rural periférico':'rp','Perímetro Sur':'ps','Perímetro Surponiente':'pso','Electromovilidad':'em','CTA':'cta','CTR':'ctr','CTE':'cte'};
 let BASE,POIS,RUTAS;
 try{
   const get=u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u);return r.json()});
@@ -880,7 +880,7 @@ try{
   RUTAS={features:rut.features.filter(f=>CATMAP[f.properties.categoria]).map(f=>{const p=f.properties;return {type:'Feature',geometry:f.geometry,properties:{c:CATMAP[p.categoria],s:String(p.servicio),n:p.nombre||'',o:p.operador||'',d:p.sentido||'',r:p.recorrido||'',m:p.comunas||'',k:+p.km||0,z:p.zona||''}}})};
 }catch(e){document.getElementById('list').innerHTML='<div class="empty">No se pudieron cargar los datos del mapa. Si abriste el archivo directamente desde tu computador, el navegador bloquea la carga: súbelo a GitHub Pages o ábrelo con un servidor local.</div>';return}
 document.getElementById('cargando')?.remove();
-const CATS={rc:{name:'Rural corriente',col:'#0b7a5a'},rp:{name:'Rural periférico',col:'#1d5fd1'},cta:{name:'CTA',full:'Conectividad Terrestre Aislada',col:'#7c3aed'},ctr:{name:'CTR',full:'Conectividad Rural',col:'#db2777'},cte:{name:'CTE',full:'Transporte escolar',col:'#d97706'}};
+const CATS={rc:{name:'Rural corriente',col:'#0b7a5a'},rp:{name:'Rural periférico',col:'#1d5fd1'},ps:{name:'Perímetro Sur',full:'Buses regulados',col:'#b91c1c'},pso:{name:'Perímetro Surponiente',full:'Buses regulados',col:'#0e7490'},em:{name:'Electromovilidad',full:'Buses eléctricos',col:'#65a30d'},cta:{name:'CTA',full:'Conectividad Terrestre Aislada',col:'#7c3aed'},ctr:{name:'CTR',full:'Conectividad Rural',col:'#db2777'},cte:{name:'CTE',full:'Transporte escolar',col:'#d97706'}};
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const cap=n=>(n.charAt(0)+n.slice(1).toLowerCase()).replace('ds212','DS212');
 const tc=n=>n.toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase()).replace(/ (De|Del) /g,m=>m.toLowerCase());
@@ -916,7 +916,7 @@ const baseW=c=>c==='cte'?2:2.6;
 Object.values(svcs).forEach(s=>{s.col=CATS[s.c].col;s.lines=s.feats.map(f=>{const l=L.geoJSON(f,{style:()=>({renderer:rend.rut,color:s.col,weight:baseW(s.c),opacity:.85,lineCap:'round',lineJoin:'round'})});l.on('click',e=>{L.DomEvent.stop(e);select(s.id,null)});l.addTo(groups[s.c]);l._p=f.properties;return l})});
 map.fitBounds(L.geoJSON(BASE.com).getBounds(),{padding:[10,10]});lbl();
 // capas
-const vis={rc:true,rp:true,cta:true,ctr:true,cte:true,vias:true,per:false,com:true,loc:false,esc:false};
+const vis={rc:true,rp:true,ps:true,pso:true,em:true,cta:true,ctr:true,cte:true,vias:true,per:false,com:true,loc:false,esc:false};
 const extra={vias:vias,per:perim,com:{addTo:m=>{comunas.addTo(m);lblLayer.addTo(m)},remove:()=>{comunas.remove();lblLayer.remove()}}};
 const mk=(k,name,sw,box,cont)=>{const b=document.createElement('button');b.className='chip';b.id='lay-'+k;b.setAttribute('aria-pressed',vis[k]);b.innerHTML='<span class="sw'+(box===1?' box':box===2?' pt':'')+'" style="background:'+sw+'"></span>'+name;b.onclick=()=>{vis[k]=!vis[k];b.setAttribute('aria-pressed',vis[k]);const g=groups[k]||extra[k]||null;if(k==='loc'||k==='esc'){poiVis();render();return}vis[k]?g.addTo(map):g.remove();if(k==='per')leg.hidden=!vis.per;render()};cont.appendChild(b)};
 const lr=document.getElementById('layers-rutas'),lc=document.getElementById('layers');
