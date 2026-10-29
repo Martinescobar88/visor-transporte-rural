@@ -834,9 +834,9 @@ main{position:relative;min-width:0;min-height:0}
   <div class="dlg">
     <div class="dlg-top"><h2 id="ayuda-t">Cómo usar el visor</h2><button class="close" id="ayuda-x" aria-label="Cerrar">×</button></div>
     <ol class="pasos">
-      <li><b>Busca</b> el número de tu micro, el nombre de la empresa, tu comuna o tu localidad en el buscador.</li>
+      <li><b>Busca</b> el nombre o número de tu servicio, o el nombre de tu localidad, en el buscador.</li>
       <li><b>Toca un recorrido</b> en la lista o en el mapa para ver por dónde pasa. Con los botones Ida y Regreso ves cada sentido.</li>
-      <li><b>Toca cualquier punto del mapa</b>, por ejemplo tu casa, para ver qué micros pasan a menos de 500 metros.</li>
+      <li><b>Toca cualquier punto del mapa</b>, por ejemplo tu casa, para ver qué servicios pasan a menos de 500 metros.</li>
       <li><b>Toca el botón Capas</b>, abajo a la izquierda del mapa, para mostrar u ocultar cada tipo de servicio y cambiar el fondo del mapa.</li>
     </ol>
     <h3 id="acerca">Sobre los datos</h3>
@@ -844,7 +844,7 @@ main{position:relative;min-width:0;min-height:0}
     <ul class="fuentes">
       <li>Recorridos: compilado MTT Región Metropolitana (octubre 2026), ajustados a la red vial.</li>
       <li>Comunas y perímetros: mapa base MTT.</li>
-      <li>Vías: OpenStreetMap. Caseríos y localidades: Censo 2024 (INE).</li>
+      <li>Vías: OpenStreetMap. Localidades (búsqueda): Censo 2024 (INE).</li>
       <li>Mapas de fondo: Esri.</li>
     </ul>
   </div>
@@ -913,13 +913,13 @@ const baseW=c=>c==='cte'?2:2.6;
 Object.values(svcs).forEach(s=>{s.col=CATS[s.c].col;s.lines=s.feats.map(f=>{const l=L.geoJSON(f,{style:()=>({renderer:rend.rut,color:s.col,weight:baseW(s.c),opacity:.85,lineCap:'round',lineJoin:'round'})});l.on('click',e=>{L.DomEvent.stop(e);select(s.id,null)});l.addTo(groups[s.c]);l._p=f.properties;return l})});
 map.fitBounds(L.geoJSON(BASE.com).getBounds(),{padding:[10,10]});lbl();
 // capas
-const vis={rc:true,rp:true,cta:true,ctr:true,cte:true,vias:true,per:false,com:true,loc:true,esc:false};
+const vis={rc:true,rp:true,cta:true,ctr:true,cte:true,vias:true,per:false,com:true,loc:false,esc:false};
 const extra={vias:vias,per:perim,com:{addTo:m=>{comunas.addTo(m);lblLayer.addTo(m)},remove:()=>{comunas.remove();lblLayer.remove()}}};
 const mk=(k,name,sw,box,cont)=>{const b=document.createElement('button');b.className='chip';b.id='lay-'+k;b.setAttribute('aria-pressed',vis[k]);b.innerHTML='<span class="sw'+(box===1?' box':box===2?' pt':'')+'" style="background:'+sw+'"></span>'+name;b.onclick=()=>{vis[k]=!vis[k];b.setAttribute('aria-pressed',vis[k]);const g=groups[k]||extra[k]||null;if(k==='loc'||k==='esc'){poiVis();render();return}vis[k]?g.addTo(map):g.remove();if(k==='per')leg.hidden=!vis.per;render()};cont.appendChild(b)};
 const lr=document.getElementById('layers-rutas'),lc=document.getElementById('layers');
 Object.entries(CATS).forEach(([k,v])=>mk(k,v.name,v.col,0,lr));
-mk('vias','Vías estructurantes','#5c625f',0,lc);mk('per','Perímetros','#2563eb',1,lc);mk('com','Comunas','#7f948e',1,lc);mk('loc','Caseríos','#15302c',2,lc);
-lc.insertAdjacentHTML('afterend','<p class="hint" id="poihint">Los caseríos aparecen al acercar el mapa.</p>');
+mk('vias','Vías estructurantes','#5c625f',0,lc);mk('per','Perímetros','#2563eb',1,lc);mk('com','Comunas','#7f948e',1,lc);
+
 window.POIVIS=1;poiVis();
 const leg=document.getElementById('leg');leg.innerHTML=BASE.per.features.map(f=>{const n=f.properties.nombre;return '<li><i style="border-color:'+PERCOL[f.properties.orden]+';background:'+PERCOL[f.properties.orden]+'22'+(n.includes('NO IMPLEMENTADO')?';border-style:dashed':'')+'"></i>'+cap(n)+'</li>'}).join('');
 // lista
