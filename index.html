@@ -726,6 +726,9 @@ h1{font-family:var(--f-display);font-weight:700;font-size:28px;line-height:1.05;
 .hits{display:flex;flex-direction:column;gap:2px;padding:0 8px 12px;max-height:50vh;overflow:auto}
 .hit{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;text-align:left;font:inherit;font-size:15px;padding:8px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer}
 .hit:hover{background:var(--bg)}
+.hit.first{background:var(--bg);box-shadow:inset 3px 0 0 var(--sel)}
+.hit .km b{color:var(--sel);font-size:12px}
+.hit .km{text-align:right}
 .hit .km{font-size:14px;color:var(--muted);font-variant-numeric:tabular-nums}
 .nada{padding:0 16px 14px;margin:0;color:var(--muted)}
 .toprow{display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -824,7 +827,7 @@ main{position:relative;min-width:0;min-height:0}
     <div class="head">
       <div class="toprow"><div class="eyebrow">Información referencial · oct. 2026</div><button class="ayuda-btn" id="ayuda-btn" aria-haspopup="dialog">Cómo usar</button></div>
       <h1>Transporte rural Región Metropolitana</h1>
-      <p class="sub">Recorridos de buses rurales y subsidiados. Toca el mapa para ver qué pasa cerca.</p>
+      <p class="sub">Recorridos de buses rurales y subsidiados. Toca el mapa o busca tu localidad para ver el servicio más cercano.</p>
       <div class="search"><input id="q" type="search" placeholder="Buscar servicio, operador, comuna o localidad" aria-label="Buscar servicio, operador, comuna o localidad" autocomplete="off"></div>
     </div>
     <div class="list" id="list"><div class="empty" id="cargando">Cargando recorridos…</div></div>
@@ -836,7 +839,7 @@ main{position:relative;min-width:0;min-height:0}
     <ol class="pasos">
       <li><b>Busca</b> el nombre o número de tu servicio, o el nombre de tu localidad, en el buscador.</li>
       <li><b>Toca un recorrido</b> en la lista o en el mapa para ver por dónde pasa. Con los botones Ida y Regreso ves cada sentido.</li>
-      <li><b>Toca cualquier punto del mapa</b>, por ejemplo tu casa, para ver qué servicios pasan a menos de 500 metros.</li>
+      <li><b>Toca cualquier punto del mapa</b>, por ejemplo tu casa, para ver qué servicios pasan a menos de 2 kilómetros, empezando por el más cercano.</li>
       <li><b>Toca el botón Capas</b>, abajo a la izquierda del mapa, para mostrar u ocultar cada tipo de servicio y cambiar el fondo del mapa.</li>
     </ol>
     <h3 id="acerca">Sobre los datos</h3>
@@ -942,7 +945,7 @@ function render(){
     list.appendChild(d)});
   if(t.length>=3){const pl=[];POIS.loc.forEach(p=>{if(norm(p[2]).includes(t))pl.push([p,p[4]+' · '+p[3]+' · '+p[5]+' hab.'])});
     if(pl.length){const d=document.createElement('details');d.className='cat';d.open=true;d.innerHTML='<summary><span class="dot" style="background:var(--ink)"></span>Lugares<span class="n">'+pl.length+'</span></summary>';
-      pl.slice(0,12).forEach(([p,sub])=>{const b=document.createElement('button');b.className='svc lugar';b.innerHTML='<span class="pin" aria-hidden="true"></span><span class="txt">'+esc(p[2])+'<br><small>'+esc(sub)+'</small></span><span class="km">ver</span>';b.onclick=()=>{map.setView([p[1],p[0]],14);cerca(L.latLng(p[1],p[0]),p[2])};d.appendChild(b)});
+      pl.slice(0,12).forEach(([p,sub])=>{const b=document.createElement('button');b.className='svc lugar';b.innerHTML='<span class="pin" aria-hidden="true"></span><span class="txt">'+esc(p[2])+'<br><small>'+esc(sub)+'</small></span><span class="km">ver</span>';b.onclick=()=>{map.setView([p[1],p[0]],13);cerca(L.latLng(p[1],p[0]),p[2])};d.appendChild(b)});
       list.prepend(d);total+=pl.length}}
   if(!total)list.innerHTML='<div class="empty">No hay recorridos que coincidan con «'+esc(q.value)+'». Prueba con el número del servicio (por ejemplo 500044 o CTE0112), el operador o una comuna.</div>';
 }
@@ -973,7 +976,7 @@ function select(id,v){
   const el=document.getElementById('svc-'+id.replace('|','-'));if(el)el.scrollIntoView({block:'nearest'});
 }
 let cercaM=null;
-const R=500;
+const R=2000;
 function distSeg(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1];let t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1);t=Math.max(0,Math.min(1,t));const x=a[0]+t*dx-p[0],y=a[1]+t*dy-p[1];return Math.sqrt(x*x+y*y)}
 function cerca(ll,titulo){
   if(cur){cur=null;curVar=null;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})))}
@@ -981,16 +984,16 @@ function cerca(ll,titulo){
   const hits=[];
   Object.values(svcs).forEach(s=>{if(!vis[s.c])return;let best=1e9;
     s.feats.forEach(f=>{const c=f.geometry.coordinates;for(let i=1;i<c.length;i++){const a=c[i-1],b=c[i];
-      if(Math.abs(a[0]-ll.lng)>.02&&Math.abs(b[0]-ll.lng)>.02)continue;if(Math.abs(a[1]-ll.lat)>.02&&Math.abs(b[1]-ll.lat)>.02)continue;
+      if(Math.abs(a[0]-ll.lng)>.04&&Math.abs(b[0]-ll.lng)>.04)continue;if(Math.abs(a[1]-ll.lat)>.03&&Math.abs(b[1]-ll.lat)>.03)continue;
       const d=distSeg(P,[a[0]*kx,a[1]*ky],[b[0]*kx,b[1]*ky]);if(d<best)best=d}});
     if(best<=R)hits.push([s,best])});
   hits.sort((a,b)=>a[1]-b[1]);
   if(cercaM)cercaM.remove();
   cercaM=L.layerGroup([L.circle(ll,{radius:R,color:css('--sel'),weight:2,fillColor:css('--sel'),fillOpacity:.08,interactive:false}),L.circleMarker(ll,{radius:7,color:'#fff',weight:2,fillColor:css('--sel'),fillOpacity:1,interactive:false})]).addTo(map);
-  Object.values(svcs).forEach(o=>{const on=hits.some(h=>h[0]===o);o.lines.forEach(l=>l.setStyle({opacity:on?.95:.12,weight:on?3.5:baseW(o.c)}))});
-  ficha.innerHTML='<div class="top"><div><div class="num cerca">Cerca de aquí</div><div class="op">'+esc(titulo||'Punto en el mapa')+' · a menos de 500 m</div></div><button class="close" id="cerrar" aria-label="Cerrar">×</button></div>'+
-    (hits.length?'<div class="hits">'+hits.map(([s,d])=>'<button class="hit" data-id="'+esc(s.id)+'"><span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc([...s.ops][0]||CATS[s.c].full||CATS[s.c].name)+'</span><span class="km">'+Math.round(d/10)*10+' m</span></button>').join('')+'</div>'
-      :'<p class="nada">No pasa ningún recorrido a menos de 500 m de este punto.</p>');
+  Object.values(svcs).forEach(o=>{const on=hits.some(h=>h[0]===o);const top=hits.length&&hits[0][0]===o;o.lines.forEach(l=>{l.setStyle({opacity:on?.95:.12,weight:top?6:on?3.5:baseW(o.c)});if(top)l.bringToFront()})});
+  ficha.innerHTML='<div class="top"><div><div class="num cerca">Cerca de aquí</div><div class="op">'+esc(titulo||'Punto en el mapa')+' · servicios a menos de 2 km, del más cercano al más lejano</div></div><button class="close" id="cerrar" aria-label="Cerrar">×</button></div>'+
+    (hits.length?'<div class="hits">'+hits.map(([s,d],i)=>'<button class="hit'+(i===0?' first':'')+'" data-id="'+esc(s.id)+'"><span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc([...s.ops][0]||CATS[s.c].full||CATS[s.c].name)+'</span><span class="km">'+(i===0?'<b>Más cercano</b><br>':'')+(d<1000?Math.round(d/10)*10+' m':(d/1000).toFixed(1).replace('.',',')+' km')+'</span></button>').join('')+'</div>'
+      :'<p class="nada">No pasa ningún servicio a menos de 2 km de este punto.</p>');
   ficha.hidden=false;
   document.getElementById('cerrar').onclick=clear;
   ficha.querySelectorAll('.hit').forEach(b=>b.onclick=()=>select(b.dataset.id,null));
