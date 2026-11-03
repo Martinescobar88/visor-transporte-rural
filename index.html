@@ -769,6 +769,26 @@ dialog::backdrop{background:rgba(10,20,18,.5)}
 .layers{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 10px}
 .head .blabel{display:block;margin-top:10px}
 .search{position:sticky;top:0}
+.fcom{display:flex;align-items:center;gap:8px;margin-top:8px}
+.fcom label{font-size:14px;color:var(--muted);flex:none}
+.fcom select{flex:1;min-width:0;font:inherit;font-size:16px;padding:8px 10px;border:2px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink)}
+.fcom select.on{border-color:var(--sel);font-weight:700}
+.fcom .x{font:inherit;font-size:14px;border:0;background:transparent;color:var(--sel);cursor:pointer;padding:6px 4px;text-decoration:underline}
+.sup{border-bottom:1px solid var(--line)}
+.sup>summary{display:flex;align-items:center;gap:8px;padding:14px 8px;cursor:pointer;font-weight:700;font-size:16px;list-style:none}
+.sup>summary::-webkit-details-marker{display:none}
+.sup>summary::before{content:"▸";color:var(--muted);transition:transform .15s}
+.sup[open]>summary::before{transform:rotate(90deg)}
+.sup>summary .dots{display:flex;gap:3px}
+.sup>summary .dots i{width:10px;height:10px;border-radius:50%}
+.sup>summary small{font-weight:400;color:var(--muted);font-size:13px}
+.sup>summary .n{margin-left:auto;color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
+.sup .cat{margin-left:14px;border-bottom:0;border-top:1px solid var(--line)}
+.sup .cat summary{padding:10px 8px;font-size:15px}
+.capas-panel .gl{display:block;font-size:13px;font-weight:700;margin:8px 0 0}
+.panel-btn{font:inherit;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:2px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
+.app.sinpanel{grid-template-columns:1fr;grid-template-rows:1fr}
+.app.sinpanel aside{display:none}
 .cat{border-bottom:1px solid var(--line)}
 .cat summary{display:flex;align-items:center;gap:8px;padding:12px 8px;cursor:pointer;font-weight:700;font-size:15px;list-style:none}
 .cat summary::-webkit-details-marker{display:none}
@@ -815,8 +835,9 @@ main{position:relative;min-width:0;min-height:0}
   .app{grid-template-columns:1fr;grid-template-rows:1fr auto}
   main{grid-row:1} aside{grid-row:2;border-right:0;border-top:1px solid var(--line);max-height:46vh}
   .head{padding-block:10px;padding-right:max(16px,env(safe-area-inset-right,0px))}
-  h1{font-size:22px;margin-bottom:8px} .eyebrow{display:none}
+  h1{font-size:22px;margin-bottom:8px} .eyebrow{display:none} .sub{display:none}
   .foot{display:none}
+  .app.sinpanel{grid-template-rows:1fr}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -829,6 +850,7 @@ main{position:relative;min-width:0;min-height:0}
       <h1>Transporte rural Región Metropolitana</h1>
       <p class="sub">Recorridos de buses rurales, regulados y subsidiados. Toca el mapa o busca tu localidad para ver el servicio más cercano.</p>
       <div class="search"><input id="q" type="search" placeholder="Buscar servicio, operador, comuna o localidad" aria-label="Buscar servicio, operador, comuna o localidad" autocomplete="off"></div>
+      <div class="fcom"><label for="fcom">Comuna</label><select id="fcom"><option value="">Todas las comunas</option></select><button class="x" id="fcom-x" hidden>Quitar</button></div>
     </div>
     <div class="list" id="list"><div class="empty" id="cargando">Cargando recorridos…</div></div>
     <div class="foot">Visor referencial, no oficial del Ministerio de Transportes. Recorridos aproximados, actualizados a octubre de 2026. <button class="link" id="acerca-btn">Fuentes y detalles</button></div>
@@ -840,6 +862,7 @@ main{position:relative;min-width:0;min-height:0}
       <li><b>Busca</b> el nombre o número de tu servicio, o el nombre de tu localidad, en el buscador.</li>
       <li><b>Toca un recorrido</b> en la lista o en el mapa para ver por dónde pasa. Con los botones Ida y Regreso ves cada sentido.</li>
       <li><b>Toca cualquier punto del mapa</b>, por ejemplo tu casa, para ver qué servicios pasan a menos de 2 kilómetros, empezando por el más cercano.</li>
+      <li><b>Elige una comuna</b> bajo el buscador para ver solo los servicios que pasan por ella.</li>
       <li><b>Toca el botón Capas</b>, abajo a la izquierda del mapa, para mostrar u ocultar cada tipo de servicio y cambiar el fondo del mapa.</li>
     </ol>
     <h3 id="acerca">Sobre los datos</h3>
@@ -856,7 +879,7 @@ main{position:relative;min-width:0;min-height:0}
   <div class="capas-panel" id="capas-panel" hidden>
     <div class="cp-top"><b>Capas</b><button class="close" id="capas-x" aria-label="Cerrar capas">×</button></div>
       <span class="blabel">Recorridos</span>
-      <div class="layers" id="layers-rutas"></div>
+      <div id="layers-rutas"></div>
       <span class="blabel">Capas de referencia</span>
       <div class="layers" id="layers"></div>
       <ul class="leg" id="leg" hidden></ul>
@@ -877,9 +900,10 @@ try{
   const [rut,com,per,vias,loc]=await Promise.all(['rutas','comunas','perimetros','vias','localidades'].map(n=>get('datos/'+n+'.geojson')));
   BASE={com,per,vias};
   POIS={loc:loc.features.map(f=>[f.geometry.coordinates[0],f.geometry.coordinates[1],f.properties.nombre,f.properties.comuna,f.properties.categoria,f.properties.habitantes]),esc:[]};
-  RUTAS={features:rut.features.filter(f=>CATMAP[f.properties.categoria]).map(f=>{const p=f.properties;return {type:'Feature',geometry:f.geometry,properties:{c:CATMAP[p.categoria],s:String(p.servicio),n:p.nombre||'',o:p.operador||'',d:p.sentido||'',r:p.recorrido||'',m:p.comunas||'',k:+p.km||0,z:p.zona||''}}})};
+  RUTAS={features:rut.features.filter(f=>CATMAP[f.properties.categoria]).map(f=>{const p=f.properties;return {type:'Feature',geometry:f.geometry,properties:{c:CATMAP[p.categoria],s:String(p.servicio),n:p.nombre||'',o:p.operador||'',d:p.sentido||'',r:p.recorrido||'',m:p.comunas||'',f:p.cf||p.comunas||'',k:+p.km||0,z:p.zona||''}}})};
 }catch(e){document.getElementById('list').innerHTML='<div class="empty">No se pudieron cargar los datos del mapa. Si abriste el archivo directamente desde tu computador, el navegador bloquea la carga: súbelo a GitHub Pages o ábrelo con un servidor local.</div>';return}
 document.getElementById('cargando')?.remove();
+const SUP=[{id:'rur',name:'Buses rurales',cats:['rc','rp']},{id:'reg',name:'Buses regulados',full:'Perímetros y electromovilidad',cats:['ps','pso','em']},{id:'sub',name:'Servicios subsidiados',full:'CTA, CTR y CTE',cats:['cta','ctr','cte']}];
 const CATS={rc:{name:'Rural corriente',col:'#0b7a5a'},rp:{name:'Rural periférico',col:'#1d5fd1'},ps:{name:'Perímetro Sur',full:'Buses regulados',col:'#b91c1c'},pso:{name:'Perímetro Surponiente',full:'Buses regulados',col:'#0e7490'},em:{name:'Electromovilidad',full:'Buses eléctricos',col:'#65a30d'},cta:{name:'CTA',full:'Conectividad Terrestre Aislada',col:'#7c3aed'},ctr:{name:'CTR',full:'Conectividad Rural',col:'#db2777'},cte:{name:'CTE',full:'Transporte escolar',col:'#d97706'}};
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const cap=n=>(n.charAt(0)+n.slice(1).toLowerCase()).replace('ds212','DS212');
@@ -908,8 +932,8 @@ const lbl=()=>{mapEl.classList.toggle('nolbl',map.getZoom()<9);mapEl.classList.t
 // servicios
 const svcs={};
 RUTAS.features.forEach(f=>{const p=f.properties;const k=p.c+'|'+p.s;
-  const s=svcs[k]=svcs[k]||{id:k,c:p.c,s:p.s,ops:new Set(),zonas:new Set(),comunas:new Set(),feats:[]};
-  if(p.o)s.ops.add(p.o);if(p.z)s.zonas.add(p.z);p.m.split(', ').filter(Boolean).forEach(c=>s.comunas.add(c));s.feats.push(f)});
+  const s=svcs[k]=svcs[k]||{id:k,c:p.c,s:p.s,ops:new Set(),zonas:new Set(),comunas:new Set(),cf:new Set(),feats:[]};
+  if(p.o)s.ops.add(p.o);if(p.z)s.zonas.add(p.z);p.m.split(', ').filter(Boolean).forEach(c=>s.comunas.add(c));p.f.split(', ').filter(Boolean).forEach(c=>s.cf.add(c));s.feats.push(f)});
 const variant=(p)=>{let v=p.n.replace(p.s,'').replace(/^[\s|_]+/,'').replace(/_/g,' ').trim();return v||p.n};
 const groups={};Object.keys(CATS).forEach(c=>groups[c]=L.layerGroup().addTo(map));
 const baseW=c=>c==='cte'?2:2.6;
@@ -920,34 +944,59 @@ const vis={rc:true,rp:true,ps:true,pso:true,em:true,cta:true,ctr:true,cte:true,v
 const extra={vias:vias,per:perim,com:{addTo:m=>{comunas.addTo(m);lblLayer.addTo(m)},remove:()=>{comunas.remove();lblLayer.remove()}}};
 const mk=(k,name,sw,box,cont)=>{const b=document.createElement('button');b.className='chip';b.id='lay-'+k;b.setAttribute('aria-pressed',vis[k]);b.innerHTML='<span class="sw'+(box===1?' box':box===2?' pt':'')+'" style="background:'+sw+'"></span>'+name;b.onclick=()=>{vis[k]=!vis[k];b.setAttribute('aria-pressed',vis[k]);const g=groups[k]||extra[k]||null;if(k==='loc'||k==='esc'){poiVis();render();return}vis[k]?g.addTo(map):g.remove();if(k==='per')leg.hidden=!vis.per;render()};cont.appendChild(b)};
 const lr=document.getElementById('layers-rutas'),lc=document.getElementById('layers');
-Object.entries(CATS).forEach(([k,v])=>mk(k,v.name,v.col,0,lr));
+SUP.forEach(g=>{const h=document.createElement('span');h.className='gl';h.textContent=g.name;lr.appendChild(h);const w=document.createElement('div');w.className='layers';lr.appendChild(w);g.cats.forEach(k=>mk(k,CATS[k].name,CATS[k].col,0,w))});
 mk('vias','Vías estructurantes','#5c625f',0,lc);mk('per','Perímetros','#2563eb',1,lc);mk('com','Comunas','#7f948e',1,lc);
 
 window.POIVIS=1;poiVis();
 const leg=document.getElementById('leg');leg.innerHTML=BASE.per.features.map(f=>{const n=f.properties.nombre;return '<li><i style="border-color:'+PERCOL[f.properties.orden]+';background:'+PERCOL[f.properties.orden]+'22'+(n.includes('NO IMPLEMENTADO')?';border-style:dashed':'')+'"></i>'+cap(n)+'</li>'}).join('');
+// filtro por comuna
+let fc='';const inF=s=>!fc||s.cf.has(fc);
+const fsel=document.getElementById('fcom'),fx=document.getElementById('fcom-x');
+[...new Set(Object.values(svcs).flatMap(s=>[...s.cf]))].sort((a,b)=>a.localeCompare(b,'es')).forEach(n=>{const o=document.createElement('option');o.value=o.textContent=n;fsel.appendChild(o)});
+let fcL=null;
+function setF(n){fc=n;fsel.value=n;fsel.classList.toggle('on',!!n);fx.hidden=!n;
+  if(cur||cercaM)clear();
+  Object.values(svcs).forEach(s=>{const on=inF(s);s.lines.forEach(l=>{on?groups[s.c].addLayer(l):groups[s.c].removeLayer(l)})});
+  if(fcL){fcL.remove();fcL=null}
+  if(n){const ls=[];comunas.eachLayer(l=>{if(tc(l.feature.properties.nombre)===n)ls.push(l)});
+    if(ls.length){fcL=L.geoJSON(ls.map(l=>l.feature),{interactive:false,style:{color:css('--sel'),weight:3,fill:false}}).addTo(map);map.fitBounds(fcL.getBounds(),{padding:[30,30]})}}
+  render()}
+fsel.onchange=()=>setF(fsel.value);fx.onclick=()=>setF('');
+// ocultar / mostrar lista
+const appEl=document.querySelector('.app');
+const PB=L.Control.extend({options:{position:'topleft'},onAdd(){const b=L.DomUtil.create('button','panel-btn');b.type='button';
+  const upd=()=>{const h=appEl.classList.contains('sinpanel');b.textContent=h?'☰ Mostrar lista':'✕ Ocultar lista';b.setAttribute('aria-expanded',!h)};upd();
+  L.DomEvent.disableClickPropagation(b);b.onclick=()=>{appEl.classList.toggle('sinpanel');upd();setTimeout(()=>map.invalidateSize(),50)};return b}});
+map.zoomControl.setPosition('topleft');new PB().addTo(map);
 // lista
 const list=document.getElementById('list'),q=document.getElementById('q');
 let cur=null,curVar=null;const openCat={};
 const norm=t=>(t||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=t=>String(t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 const kmOf=s=>Math.max(...s.feats.map(f=>f.properties.k||0));
+const openSup={};
 function render(){
   const t=norm(q.value.trim());list.innerHTML='';let total=0;
-  Object.entries(CATS).forEach(([c,v])=>{if(!vis[c])return;
-    const items=Object.values(svcs).filter(s=>s.c===c).filter(s=>!t||norm(s.s+' '+s.feats.map(f=>f.properties.r).join(' ')+' '+[...s.ops].join(' ')+' '+[...s.comunas].join(' ')+' '+v.name+' '+(v.full||'')+' '+s.feats.map(f=>f.properties.n).join(' ')).includes(t)).sort((a,b)=>a.s.localeCompare(b.s,'es',{numeric:true}));
-    if(!items.length)return;total+=items.length;
+  SUP.forEach(g=>{let gt=0;const sd=document.createElement('details');sd.className='sup';
+  g.cats.forEach(c=>{const v=CATS[c];if(!vis[c])return;
+    const items=Object.values(svcs).filter(s=>s.c===c).filter(inF).filter(s=>!t||norm(s.s+' '+s.feats.map(f=>f.properties.r).join(' ')+' '+[...s.ops].join(' ')+' '+[...s.comunas].join(' ')+' '+v.name+' '+(v.full||'')+' '+s.feats.map(f=>f.properties.n).join(' ')).includes(t)).sort((a,b)=>a.s.localeCompare(b.s,'es',{numeric:true}));
+    if(!items.length)return;total+=items.length;gt+=items.length;
     const d=document.createElement('details');d.className='cat';d.open=!!t||openCat[c]||(cur&&svcs[cur].c===c);d.ontoggle=()=>{openCat[c]=d.open};
     d.innerHTML='<summary><span class="dot" style="background:'+v.col+'"></span>'+v.name+(v.full?' <small>'+v.full+'</small>':'')+'<span class="n">'+items.length+'</span></summary>';
     items.forEach(s=>{const b=document.createElement('button');b.className='svc'+(cur===s.id?' on':'');b.id='svc-'+s.id.replace('|','-');
       const op=[...s.ops][0];const rs=[...new Set(s.feats.map(f=>f.properties.r))];const rec=rs.length===1?rs[0]:'';const sub=op||rec||[...s.comunas].slice(0,3).join(', ');
       b.innerHTML='<span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(sub)+'<br><small>'+((op||rec)?esc([...s.comunas].slice(0,3).join(', '))+' · ':'')+s.feats.length+(s.feats.length===1?' trazado':' trazados')+'</small></span><span class="km">'+kmOf(s).toFixed(0)+' km</span>';
       b.onclick=()=>select(s.id,null);d.appendChild(b)});
-    list.appendChild(d)});
+    sd.appendChild(d)});
+  if(!gt)return;
+  sd.open=!!t||!!fc||openSup[g.id]||(cur&&g.cats.includes(svcs[cur].c));sd.ontoggle=()=>{openSup[g.id]=sd.open};
+  const sm=document.createElement('summary');sm.innerHTML='<span class="dots">'+g.cats.filter(c=>vis[c]).map(c=>'<i style="background:'+CATS[c].col+'"></i>').join('')+'</span>'+g.name+'<span class="n">'+gt+'</span>';
+  sd.prepend(sm);list.appendChild(sd)});
   if(t.length>=3){const pl=[];POIS.loc.forEach(p=>{if(norm(p[2]).includes(t))pl.push([p,p[4]+' · '+p[3]+' · '+p[5]+' hab.'])});
     if(pl.length){const d=document.createElement('details');d.className='cat';d.open=true;d.innerHTML='<summary><span class="dot" style="background:var(--ink)"></span>Lugares<span class="n">'+pl.length+'</span></summary>';
       pl.slice(0,12).forEach(([p,sub])=>{const b=document.createElement('button');b.className='svc lugar';b.innerHTML='<span class="pin" aria-hidden="true"></span><span class="txt">'+esc(p[2])+'<br><small>'+esc(sub)+'</small></span><span class="km">ver</span>';b.onclick=()=>{map.setView([p[1],p[0]],13);cerca(L.latLng(p[1],p[0]),p[2])};d.appendChild(b)});
       list.prepend(d);total+=pl.length}}
-  if(!total)list.innerHTML='<div class="empty">No hay recorridos que coincidan con «'+esc(q.value)+'». Prueba con el número del servicio (por ejemplo 500044 o CTE0112), el operador o una comuna.</div>';
+  if(!total)list.innerHTML=(fc&&!t)?'<div class="empty">No hay recorridos visibles que pasen por '+esc(fc)+'.</div>':'<div class="empty">No hay recorridos que coincidan con «'+esc(q.value)+'»'+(fc?' en '+esc(fc):'')+'. Prueba con el número del servicio (por ejemplo 500044 o CTE0112), el operador o una comuna.</div>';
 }
 q.addEventListener('input',render);
 const ficha=document.getElementById('ficha');
@@ -982,7 +1031,7 @@ function cerca(ll,titulo){
   if(cur){cur=null;curVar=null;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})))}
   const kx=111320*Math.cos(ll.lat*Math.PI/180),ky=110540;const P=[ll.lng*kx,ll.lat*ky];
   const hits=[];
-  Object.values(svcs).forEach(s=>{if(!vis[s.c])return;let best=1e9;
+  Object.values(svcs).forEach(s=>{if(!vis[s.c]||!inF(s))return;let best=1e9;
     s.feats.forEach(f=>{const c=f.geometry.coordinates;for(let i=1;i<c.length;i++){const a=c[i-1],b=c[i];
       if(Math.abs(a[0]-ll.lng)>.04&&Math.abs(b[0]-ll.lng)>.04)continue;if(Math.abs(a[1]-ll.lat)>.03&&Math.abs(b[1]-ll.lat)>.03)continue;
       const d=distSeg(P,[a[0]*kx,a[1]*ky],[b[0]*kx,b[1]*ky]);if(d<best)best=d}});
