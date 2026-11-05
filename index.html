@@ -828,6 +828,7 @@ main{position:relative;min-width:0;min-height:0}
 .ficha .op{font-size:15px;color:var(--muted)}
 .ficha dl{margin:0;padding:0 16px 14px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:16px}
 .ficha dt{color:var(--muted)} .ficha dd{margin:0;font-weight:700}
+.ficha dd.co{max-height:160px;overflow:auto} .ficha dd.co small{font-weight:400;color:var(--muted)}
 .ficha .close{font:inherit;font-size:22px;line-height:1;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:4px 8px}
 .sentidos{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 14px;max-height:132px;overflow:auto}
 .sentidos button{flex:1 1 auto;white-space:nowrap;font:inherit;font-size:15px;padding:8px;border-radius:8px;border:2px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
@@ -907,7 +908,7 @@ try{
   const [rut,com,per,vias,loc]=await Promise.all(['rutas','comunas','perimetros','vias','localidades'].map(n=>get('datos/'+n+'.geojson')));
   BASE={com,per,vias};
   POIS={loc:loc.features.map(f=>[f.geometry.coordinates[0],f.geometry.coordinates[1],f.properties.nombre,f.properties.comuna,f.properties.categoria,f.properties.habitantes]),esc:[]};
-  RUTAS={features:rut.features.filter(f=>CATMAP[f.properties.categoria]).map(f=>{const p=f.properties;return {type:'Feature',geometry:f.geometry,properties:{c:CATMAP[p.categoria],s:String(p.servicio),n:p.nombre||'',o:p.operador||'',d:p.sentido||'',r:p.recorrido||'',m:p.comunas||'',f:p.cf||p.comunas||'',k:+p.km||0,z:p.zona||''}}})};
+  RUTAS={features:rut.features.filter(f=>CATMAP[f.properties.categoria]).map(f=>{const p=f.properties;return {type:'Feature',geometry:f.geometry,properties:{c:CATMAP[p.categoria],s:String(p.servicio),n:p.nombre||'',o:p.operador||'',d:p.sentido||'',r:p.recorrido||'',m:p.comunas||'',f:p.cf||p.comunas||'',co:p.co||'',k:+p.km||0,z:p.zona||''}}})};
 }catch(e){document.getElementById('list').innerHTML='<div class="empty">No se pudieron cargar los datos del mapa. Si abriste el archivo directamente desde tu computador, el navegador bloquea la carga: súbelo a GitHub Pages o ábrelo con un servidor local.</div>';return}
 document.getElementById('cargando')?.remove();
 const SUP=[{id:'rur',name:'Buses rurales',cats:['rc','rp']},{id:'pex',name:'Perímetro de exclusión',cats:['ps','pso']},{id:'em',name:'Electromovilidad',cats:['em']},{id:'sub',name:'Servicios subsidiados',full:'CTA, CTR y CTE',cats:['cta','ctr','cte']}];
@@ -981,6 +982,9 @@ const list=document.getElementById('list'),q=document.getElementById('q');
 let cur=null,curVar=null;const openCat={};
 const norm=t=>(t||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=t=>String(t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+const idaF=s=>s.feats.find(f=>f.properties.d==='Ida')||s.feats[0];
+const coOf=f=>(f.properties.co||f.properties.m||'').split(', ').filter(Boolean);
+const odOf=s=>{const c=coOf(idaF(s));return !c.length?'':c.length===1?c[0]:c[0]+' → '+c[c.length-1]};
 const kmOf=s=>Math.max(...s.feats.map(f=>f.properties.k||0));
 const openSup={};
 function render(){
@@ -998,8 +1002,8 @@ function render(){
       kd.innerHTML='<summary>'+esc(porOp?tc(k):k)+'<span class="n">'+n.length+'</span></summary>';d.appendChild(kd);conts[k]=kd});
     if(subg)d.querySelector('summary .n').insertAdjacentHTML('beforebegin','<span class="por">por '+(porOp?'empresa':'comuna')+'</span>');
     items.forEach(s=>{const b=document.createElement('button');b.className='svc'+(cur===s.id?' on':'');b.id='svc-'+s.id.replace('|','-');
-      const op=subg&&porOp?'':[...s.ops][0];const rs=[...new Set(s.feats.map(f=>f.properties.r))];const rec=rs.length===1?rs[0]:'';const sub=op||rec||[...s.comunas].slice(0,3).join(', ');
-      b.innerHTML='<span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(sub)+'<br><small>'+((op||rec)?esc([...s.comunas].slice(0,3).join(', '))+' · ':'')+s.feats.length+(s.feats.length===1?' trazado':' trazados')+'</small></span><span class="km">'+kmOf(s).toFixed(0)+' km</span>';
+      const op=subg&&porOp?'':[...s.ops][0];const rs=[...new Set(s.feats.map(f=>f.properties.r))];const rec=rs.length===1?rs[0]:'';const od=odOf(s);const extra=[rec,op].filter(Boolean).join(' · ');
+      b.innerHTML='<span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(od||extra)+'<br><small>'+((od&&extra)?esc(extra)+' · ':'')+s.feats.length+(s.feats.length===1?' trazado':' trazados')+'</small></span><span class="km">'+kmOf(s).toFixed(0)+' km</span>';
       b.onclick=()=>select(s.id,null);(subg?conts[key(s)]:d).appendChild(b)});
     sd.appendChild(d)});
   if(!gt)return;
@@ -1034,7 +1038,10 @@ function select(id,v){
   ficha.innerHTML='<div class="top"><div><div class="num" style="color:'+s.col+'">'+esc(s.s)+'</div>'+(recs.length===1?'<div class="rec">'+esc(recs[0])+'</div>':'')+'<div class="op">'+esc(C.full?C.name+' · '+C.full:C.name)+'</div></div><button class="close" id="cerrar" aria-label="Cerrar ficha">×</button></div>'+
    (vars.length>1?'<div class="sentidos">'+['Todos'].concat(vars).map(x=>'<button aria-pressed="'+((x==='Todos'&&!curVar)||x===curVar)+'" data-v="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div>':'')+
    '<dl>'+(s.ops.size?'<dt>Operador</dt><dd>'+esc([...s.ops].join(', '))+'</dd>':'')+
-   '<dt>Comunas</dt><dd>'+esc([...s.comunas].join(', '))+'</dd>'+
+   (()=>{const fs=sents.length?[curVar?s.feats.find(f=>f.properties.d===curVar):idaF(s)]:curVar?[s.feats.find(f=>variant(f.properties)===curVar)]:s.feats.length===1||!vars.length?[s.feats[0]]:s.feats;
+     const lab=sents.length?(curVar==='Regreso'?'Comunas (regreso)':'Comunas (ida)'):'Comunas';
+     const ff=fs.filter(Boolean);const uq=new Set(ff.map(f=>coOf(f).join('|'))).size===1;const fl=uq?[ff[0]]:ff;
+     return '<dt>'+lab+'</dt><dd class="co">'+fl.map(f=>(fl.length>1?'<small>'+esc(variant(f.properties))+'</small><br>':'')+esc(coOf(f).join(' → '))).join('<br>')+'</dd>'})()+
    (sents.length?'<dt>Sentido</dt><dd>'+(curVar||sents.join(' y '))+'</dd>':(curVar?'<dt>Ruta</dt><dd>'+esc(curVar)+'</dd>':'<dt>Trazados</dt><dd>'+s.feats.length+'</dd>'))+
    '<dt>Largo</dt><dd>'+km.toFixed(1)+' km</dd></dl>';
   ficha.hidden=false;
