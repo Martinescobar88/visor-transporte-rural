@@ -785,6 +785,13 @@ dialog::backdrop{background:rgba(10,20,18,.5)}
 .sup>summary .n{margin-left:auto;color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
 .sup .cat{margin-left:14px;border-bottom:0;border-top:1px solid var(--line)}
 .sup .cat summary{padding:10px 8px;font-size:15px}
+.cat summary .por{font-weight:400;color:var(--muted);font-size:12px}
+.emp{margin-left:18px;border-top:1px solid var(--line)}
+.emp summary{display:flex;align-items:center;gap:8px;padding:9px 8px;cursor:pointer;font-size:14px;font-weight:600;list-style:none}
+.emp summary::-webkit-details-marker{display:none}
+.emp summary::before{content:"▸";color:var(--muted);transition:transform .15s}
+.emp[open] summary::before{transform:rotate(90deg)}
+.emp summary .n{margin-left:auto;color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
 .capas-panel .gl{display:block;font-size:13px;font-weight:700;margin:8px 0 0}
 .panel-btn{font:inherit;font-size:14px;font-weight:700;display:flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;border:2px solid var(--line);background:var(--panel);color:var(--ink);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .app.sinpanel{grid-template-columns:1fr;grid-template-rows:1fr}
@@ -792,8 +799,8 @@ dialog::backdrop{background:rgba(10,20,18,.5)}
 .cat{border-bottom:1px solid var(--line)}
 .cat summary{display:flex;align-items:center;gap:8px;padding:12px 8px;cursor:pointer;font-weight:700;font-size:15px;list-style:none}
 .cat summary::-webkit-details-marker{display:none}
-.cat summary::before{content:"▸";color:var(--muted);transition:transform .15s}
-.cat[open] summary::before{transform:rotate(90deg)}
+.cat>summary::before{content:"▸";color:var(--muted);transition:transform .15s}
+.cat[open]>summary::before{transform:rotate(90deg)}
 .cat summary small{font-weight:400;color:var(--muted);font-size:13px}
 .cat summary .n{margin-left:auto;color:var(--muted);font-weight:400;font-variant-numeric:tabular-nums}
 .cat .dot{width:10px;height:10px;border-radius:50%;flex:none}
@@ -951,12 +958,13 @@ window.POIVIS=1;poiVis();
 const leg=document.getElementById('leg');leg.innerHTML=BASE.per.features.map(f=>{const n=f.properties.nombre;return '<li><i style="border-color:'+PERCOL[f.properties.orden]+';background:'+PERCOL[f.properties.orden]+'22'+(n.includes('NO IMPLEMENTADO')?';border-style:dashed':'')+'"></i>'+cap(n)+'</li>'}).join('');
 // filtro por comuna
 let fc='';const inF=s=>!fc||s.cf.has(fc);
+function showLines(only){Object.values(svcs).forEach(s=>{const on=only?s.id===only:inF(s);s.lines.forEach(l=>{on?groups[s.c].addLayer(l):groups[s.c].removeLayer(l)})})}
 const fsel=document.getElementById('fcom'),fx=document.getElementById('fcom-x');
 [...new Set(Object.values(svcs).flatMap(s=>[...s.cf]))].sort((a,b)=>a.localeCompare(b,'es')).forEach(n=>{const o=document.createElement('option');o.value=o.textContent=n;fsel.appendChild(o)});
 let fcL=null;
 function setF(n){fc=n;fsel.value=n;fsel.classList.toggle('on',!!n);fx.hidden=!n;
   if(cur||cercaM)clear();
-  Object.values(svcs).forEach(s=>{const on=inF(s);s.lines.forEach(l=>{on?groups[s.c].addLayer(l):groups[s.c].removeLayer(l)})});
+  showLines(null);
   if(fcL){fcL.remove();fcL=null}
   if(n){const ls=[];comunas.eachLayer(l=>{if(tc(l.feature.properties.nombre)===n)ls.push(l)});
     if(ls.length){fcL=L.geoJSON(ls.map(l=>l.feature),{interactive:false,style:{color:css('--sel'),weight:3,fill:false}}).addTo(map);map.fitBounds(fcL.getBounds(),{padding:[30,30]})}}
@@ -983,10 +991,16 @@ function render(){
     if(!items.length)return;total+=items.length;gt+=items.length;
     const d=document.createElement('details');d.className='cat';d.open=!!t||openCat[c]||(cur&&svcs[cur].c===c);d.ontoggle=()=>{openCat[c]=d.open};
     d.innerHTML='<summary><span class="dot" style="background:'+v.col+'"></span>'+v.name+(v.full?' <small>'+v.full+'</small>':'')+'<span class="n">'+items.length+'</span></summary>';
+    const porOp=items.some(s=>s.ops.size);const key=s=>porOp?([...s.ops][0]||'Sin empresa informada'):([...s.cf][0]||'Sin comuna');
+    const keys=[...new Set(items.map(key))].sort((a,b)=>a.localeCompare(b,'es'));const subg=items.length>6&&keys.length>1;
+    const conts={};if(subg)keys.forEach(k=>{const kd=document.createElement('details');kd.className='emp';const ok=c+'|'+k;
+      const n=items.filter(s=>key(s)===k);kd.open=!!t||!!openCat[ok]||!!(cur&&n.some(s=>s.id===cur))||(!!fc&&keys.length<=3);kd.ontoggle=()=>{openCat[ok]=kd.open};
+      kd.innerHTML='<summary>'+esc(porOp?tc(k):k)+'<span class="n">'+n.length+'</span></summary>';d.appendChild(kd);conts[k]=kd});
+    if(subg)d.querySelector('summary .n').insertAdjacentHTML('beforebegin','<span class="por">por '+(porOp?'empresa':'comuna')+'</span>');
     items.forEach(s=>{const b=document.createElement('button');b.className='svc'+(cur===s.id?' on':'');b.id='svc-'+s.id.replace('|','-');
-      const op=[...s.ops][0];const rs=[...new Set(s.feats.map(f=>f.properties.r))];const rec=rs.length===1?rs[0]:'';const sub=op||rec||[...s.comunas].slice(0,3).join(', ');
+      const op=subg&&porOp?'':[...s.ops][0];const rs=[...new Set(s.feats.map(f=>f.properties.r))];const rec=rs.length===1?rs[0]:'';const sub=op||rec||[...s.comunas].slice(0,3).join(', ');
       b.innerHTML='<span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(sub)+'<br><small>'+((op||rec)?esc([...s.comunas].slice(0,3).join(', '))+' · ':'')+s.feats.length+(s.feats.length===1?' trazado':' trazados')+'</small></span><span class="km">'+kmOf(s).toFixed(0)+' km</span>';
-      b.onclick=()=>select(s.id,null);d.appendChild(b)});
+      b.onclick=()=>select(s.id,null);(subg?conts[key(s)]:d).appendChild(b)});
     sd.appendChild(d)});
   if(!gt)return;
   sd.open=!!t||!!fc||openSup[g.id]||(cur&&g.cats.includes(svcs[cur].c));sd.ontoggle=()=>{openSup[g.id]=sd.open};
@@ -1000,14 +1014,19 @@ function render(){
 }
 q.addEventListener('input',render);
 const ficha=document.getElementById('ficha');
+let haloL=null;
+function halo(ls){if(haloL){haloL.remove();haloL=null}if(!ls.length){showLines(null);return}
+  haloL=L.layerGroup(ls.map(l=>L.geoJSON(l.toGeoJSON(),{interactive:false,style:{renderer:rend.rut,color:css('--panel'),weight:11,opacity:.95,lineCap:'round',lineJoin:'round'}}))).addTo(map);
+  ls.forEach(l=>l.bringToFront())}
 function select(id,v){
   const s=svcs[id];cur=id;if(cercaM){cercaM.remove();cercaM=null}
   const sents=[...new Set(s.feats.map(f=>f.properties.d).filter(Boolean))];
   const vars=sents.length?sents:(s.feats.length>1&&s.feats.length<=8?s.feats.map(f=>variant(f.properties)):[]);
   curVar=v;
   const match=l=>!curVar||(sents.length?l._p.d===curVar:variant(l._p)===curVar);
-  Object.values(svcs).forEach(o=>o.lines.forEach(l=>{const on=o.id===id&&match(l);l.setStyle(o.id===id?{opacity:on?1:.3,weight:on?6:3}:{opacity:.12,weight:baseW(o.c)});if(on)l.bringToFront()}));
+  Object.values(svcs).forEach(o=>o.lines.forEach(l=>{const on=o.id===id&&match(l);l.setStyle(o.id===id?{opacity:on?1:.35,weight:on?6:3}:{opacity:.05,weight:1.5})}));
   const sel=s.lines.filter(match);
+  showLines(id);halo(sel);
   const b=L.featureGroup(sel).getBounds();if(b.isValid())map.fitBounds(b,{padding:[40,40],maxZoom:14});
   const km=curVar?Math.max(...sel.map(l=>l._p.k||0)):kmOf(s);
   const C=CATS[s.c];
@@ -1028,6 +1047,7 @@ let cercaM=null;
 const R=2000;
 function distSeg(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1];let t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1);t=Math.max(0,Math.min(1,t));const x=a[0]+t*dx-p[0],y=a[1]+t*dy-p[1];return Math.sqrt(x*x+y*y)}
 function cerca(ll,titulo){
+  halo([]);
   if(cur){cur=null;curVar=null;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})))}
   const kx=111320*Math.cos(ll.lat*Math.PI/180),ky=110540;const P=[ll.lng*kx,ll.lat*ky];
   const hits=[];
@@ -1056,7 +1076,7 @@ cpB.onclick=()=>capas(cpP.hidden);document.getElementById('capas-x').onclick=()=
 document.addEventListener('keydown',e=>{if(e.key==='Escape')capas(false)});
 L.DomEvent.disableClickPropagation(cpP);L.DomEvent.disableScrollPropagation(cpP);L.DomEvent.disableClickPropagation(cpB);document.getElementById('acerca-btn').onclick=()=>abrir('acerca');
 document.getElementById('ayuda-x').onclick=()=>dlg.close();
-function clear(){if(cercaM){cercaM.remove();cercaM=null}cur=null;curVar=null;ficha.hidden=true;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})));render()}
+function clear(){halo([]);if(cercaM){cercaM.remove();cercaM=null}cur=null;curVar=null;ficha.hidden=true;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})));render()}
 map.on('click',e=>{if(!cpP.hidden){capas(false);return}if(cur||cercaM){clear();return}cerca(e.latlng,null)});
 const BASES={
   osm:{name:'Calles',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',o:{maxZoom:19,attribution:'© Esri, HERE, Garmin, OpenStreetMap'}},
