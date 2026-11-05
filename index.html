@@ -855,7 +855,7 @@ main{position:relative;min-width:0;min-height:0}
     <div class="head">
       <div class="toprow"><div class="eyebrow">Información referencial · oct. 2026</div><button class="ayuda-btn" id="ayuda-btn" aria-haspopup="dialog">Cómo usar</button></div>
       <h1>Transporte rural Región Metropolitana</h1>
-      <p class="sub">Recorridos de buses rurales, regulados y subsidiados. Toca el mapa o busca tu localidad para ver el servicio más cercano.</p>
+      <p class="sub">Recorridos de buses rurales, de perímetro de exclusión, de electromovilidad y subsidiados. Toca el mapa o busca tu localidad para ver el servicio más cercano.</p>
       <div class="search"><input id="q" type="search" placeholder="Buscar servicio, operador, comuna o localidad" aria-label="Buscar servicio, operador, comuna o localidad" autocomplete="off"></div>
       <div class="fcom"><label for="fcom">Comuna</label><select id="fcom"><option value="">Todas las comunas</option></select><button class="x" id="fcom-x" hidden>Quitar</button></div>
     </div>
@@ -910,8 +910,8 @@ try{
   RUTAS={features:rut.features.filter(f=>CATMAP[f.properties.categoria]).map(f=>{const p=f.properties;return {type:'Feature',geometry:f.geometry,properties:{c:CATMAP[p.categoria],s:String(p.servicio),n:p.nombre||'',o:p.operador||'',d:p.sentido||'',r:p.recorrido||'',m:p.comunas||'',f:p.cf||p.comunas||'',k:+p.km||0,z:p.zona||''}}})};
 }catch(e){document.getElementById('list').innerHTML='<div class="empty">No se pudieron cargar los datos del mapa. Si abriste el archivo directamente desde tu computador, el navegador bloquea la carga: súbelo a GitHub Pages o ábrelo con un servidor local.</div>';return}
 document.getElementById('cargando')?.remove();
-const SUP=[{id:'rur',name:'Buses rurales',cats:['rc','rp']},{id:'reg',name:'Buses regulados',full:'Perímetros y electromovilidad',cats:['ps','pso','em']},{id:'sub',name:'Servicios subsidiados',full:'CTA, CTR y CTE',cats:['cta','ctr','cte']}];
-const CATS={rc:{name:'Rural corriente',col:'#0b7a5a'},rp:{name:'Rural periférico',col:'#1d5fd1'},ps:{name:'Perímetro Sur',full:'Buses regulados',col:'#b91c1c'},pso:{name:'Perímetro Surponiente',full:'Buses regulados',col:'#0e7490'},em:{name:'Electromovilidad',full:'Buses eléctricos',col:'#65a30d'},cta:{name:'CTA',full:'Conectividad Terrestre Aislada',col:'#7c3aed'},ctr:{name:'CTR',full:'Conectividad Rural',col:'#db2777'},cte:{name:'CTE',full:'Transporte escolar',col:'#d97706'}};
+const SUP=[{id:'rur',name:'Buses rurales',cats:['rc','rp']},{id:'pex',name:'Perímetro de exclusión',cats:['ps','pso']},{id:'em',name:'Electromovilidad',cats:['em']},{id:'sub',name:'Servicios subsidiados',full:'CTA, CTR y CTE',cats:['cta','ctr','cte']}];
+const CATS={rc:{name:'Rural corriente',col:'#0b7a5a'},rp:{name:'Rural periférico',col:'#1d5fd1'},ps:{name:'Perímetro Sur',full:'Perímetro de exclusión',col:'#b91c1c'},pso:{name:'Perímetro Surponiente',full:'Perímetro de exclusión',col:'#0e7490'},em:{name:'Electromovilidad',full:'Buses eléctricos',col:'#65a30d'},cta:{name:'CTA',full:'Conectividad Terrestre Aislada',col:'#7c3aed'},ctr:{name:'CTR',full:'Conectividad Rural',col:'#db2777'},cte:{name:'CTE',full:'Transporte escolar',col:'#d97706'}};
 const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 const cap=n=>(n.charAt(0)+n.slice(1).toLowerCase()).replace('ds212','DS212');
 const tc=n=>n.toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase()).replace(/ (De|Del) /g,m=>m.toLowerCase());
