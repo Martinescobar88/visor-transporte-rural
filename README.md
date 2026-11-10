@@ -20,3 +20,7 @@ Para actualizar una capa basta con reemplazar su archivo `.geojson`, manteniendo
 5. En 1 a 2 minutos el visor queda en `https://<usuario>.github.io/visor-transporte-rural/`.
 
 Abrir `index.html` con doble clic en el computador no funciona (el navegador bloquea la carga de los archivos de datos). Para probar en local: en la carpeta, `python -m http.server` y abrir `http://localhost:8000`.
+
+## Paradas
+
+`datos/paradas.geojson` se genera con `visor_web/scripts/v_paradas.py` a partir de los Excel de `visor_web/fuentes/paradas/` (columnas stop_id, stop_name, lines, Código, Latitud, Longitud, Descripción). Para cargar más paradas: dejar el nuevo Excel en esa carpeta, volver a correr el script y subir `datos/paradas.geojson`. En la columna `lines`, Inbound = Ida y Outbound = Regreso.

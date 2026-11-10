@@ -828,6 +828,8 @@ main{position:relative;min-width:0;min-height:0}
 .ficha .op{font-size:15px;color:var(--muted)}
 .ficha dl{margin:0;padding:0 16px 14px;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:16px}
 .ficha dt{color:var(--muted)} .ficha dd{margin:0;font-weight:700}
+.pars{padding:0 16px 14px}.pars summary{cursor:pointer;font-weight:700;color:var(--sel)}.pars ol{margin:6px 0 0;padding-left:22px;max-height:180px;overflow:auto;font-size:14px}.pars li button{font:inherit;text-align:left;border:0;background:transparent;color:var(--ink);padding:3px 0;cursor:pointer}.pars li button:hover{text-decoration:underline}
+.hits .hl{color:var(--muted);padding:0 0 4px}.ficha .nada{padding:0 16px;color:var(--muted)}
 .ficha dd.co{max-height:160px;overflow:auto} .ficha dd.co small{font-weight:400;color:var(--muted)}
 .ficha .close{font:inherit;font-size:22px;line-height:1;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:4px 8px}
 .sentidos{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 14px;max-height:132px;overflow:auto}
@@ -870,6 +872,7 @@ main{position:relative;min-width:0;min-height:0}
       <li><b>Busca</b> el nombre o número de tu servicio, o el nombre de tu localidad, en el buscador.</li>
       <li><b>Toca un recorrido</b> en la lista o en el mapa para ver por dónde pasa. Con los botones Ida y Regreso ves cada sentido.</li>
       <li><b>Toca cualquier punto del mapa</b>, por ejemplo tu casa, para ver qué servicios pasan a menos de 2 kilómetros, empezando por el más cercano.</li>
+      <li><b>Acerca el mapa</b> para ver las paradas. Toca una parada para ver qué servicios se detienen en ella; al elegir un servicio verás sus paradas en orden.</li>
       <li><b>Elige una comuna</b> bajo el buscador para ver solo los servicios que pasan por ella.</li>
       <li><b>Toca el botón Capas</b>, abajo a la izquierda del mapa, para mostrar u ocultar cada tipo de servicio y cambiar el fondo del mapa.</li>
     </ol>
@@ -906,6 +909,7 @@ let BASE,POIS,RUTAS;
 try{
   const get=u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u);return r.json()});
   const [rut,com,per,vias,loc]=await Promise.all(['rutas','comunas','perimetros','vias','localidades'].map(n=>get('datos/'+n+'.geojson')));
+  window.PAR=await get('datos/paradas.geojson').catch(()=>({features:[],orden:{}}));
   BASE={com,per,vias};
   POIS={loc:loc.features.map(f=>[f.geometry.coordinates[0],f.geometry.coordinates[1],f.properties.nombre,f.properties.comuna,f.properties.categoria,f.properties.habitantes]),esc:[]};
   RUTAS={features:rut.features.filter(f=>CATMAP[f.properties.categoria]).map(f=>{const p=f.properties;return {type:'Feature',geometry:f.geometry,properties:{c:CATMAP[p.categoria],s:String(p.servicio),n:p.nombre||'',o:p.operador||'',d:p.sentido||'',r:p.recorrido||'',m:p.comunas||'',f:p.cf||p.comunas||'',co:p.co||'',fo:p.folio||'',e:p.est||'',st:p.estado||'',k:+p.km||0,z:p.zona||''}}})};
@@ -948,12 +952,37 @@ const baseW=c=>c==='cte'?2:2.6;
 Object.values(svcs).forEach(s=>{s.col=CATS[s.c].col;s.lines=s.feats.map(f=>{const l=L.geoJSON(f,{style:()=>({renderer:rend.rut,color:s.col,weight:baseW(s.c),opacity:.85,lineCap:'round',lineJoin:'round'})});l.on('click',e=>{L.DomEvent.stop(e);select(s.id,null)});l.addTo(groups[s.c]);l._p=f.properties;return l})});
 map.fitBounds(L.geoJSON(BASE.com).getBounds(),{padding:[10,10]});lbl();
 // capas
-const vis={rc:true,rp:true,ps:true,pso:true,em:true,cta:true,ctr:true,cte:true,vias:true,per:false,com:true,loc:false,esc:false};
+const vis={rc:true,rp:true,ps:true,pso:true,em:true,cta:true,ctr:true,cte:true,vias:true,per:false,com:true,loc:false,esc:false,par:true};
 const extra={vias:vias,per:perim,com:{addTo:m=>{comunas.addTo(m);lblLayer.addTo(m)},remove:()=>{comunas.remove();lblLayer.remove()}}};
 const mk=(k,name,sw,box,cont)=>{const b=document.createElement('button');b.className='chip';b.id='lay-'+k;b.setAttribute('aria-pressed',vis[k]);b.innerHTML='<span class="sw'+(box===1?' box':box===2?' pt':'')+'" style="background:'+sw+'"></span>'+name;b.onclick=()=>{vis[k]=!vis[k];b.setAttribute('aria-pressed',vis[k]);const g=groups[k]||extra[k]||null;if(k==='loc'||k==='esc'){poiVis();render();return}vis[k]?g.addTo(map):g.remove();if(k==='per')leg.hidden=!vis.per;render()};cont.appendChild(b)};
 const lr=document.getElementById('layers-rutas'),lc=document.getElementById('layers');
 SUP.forEach(g=>{const h=document.createElement('span');h.className='gl';h.textContent=g.name;lr.appendChild(h);const w=document.createElement('div');w.className='layers';lr.appendChild(w);g.cats.forEach(k=>mk(k,CATS[k].name,CATS[k].col,0,w))});
-mk('vias','Vías estructurantes','#5c625f',0,lc);mk('per','Perímetros','#2563eb',1,lc);mk('com','Comunas','#7f948e',1,lc);
+mk('vias','Vías estructurantes','#5c625f',0,lc);mk('per','Perímetros','#2563eb',1,lc);mk('com','Comunas','#7f948e',1,lc);if(PAR.features.length)mk('par','Paradas','#fff',2,lc);
+// paradas
+const PAR_ZOOM=13,parR=L.canvas({padding:.3}),parL=L.layerGroup();let selParL=null;
+const svN=s=>Object.values(svcs).find(o=>o.s===s);
+PAR.features.forEach((f,i)=>{const [x,y]=f.geometry.coordinates;f._ll=L.latLng(y,x);const m=L.circleMarker(f._ll,{renderer:parR,radius:4.5,color:css('--ink'),weight:1.5,fillColor:'#fff',fillOpacity:1});
+  m.bindTooltip(String(f.properties.n).replace(/[<>&]/g,''));m.on('click',e=>{L.DomEvent.stop(e);parada(i)});m.addTo(parL);f._m=m});
+const parVis=()=>{(vis.par&&map.getZoom()>=PAR_ZOOM&&!cur)?parL.addTo(map):parL.remove()};map.on('zoomend',parVis);
+extra.par={addTo:()=>parVis(),remove:()=>parL.remove()};parVis();
+const SENT={I:'Ida',R:'Regreso',IR:'Ida y regreso'};
+function parada(i){const f=PAR.features[i],p=f.properties;clear();
+  const sv=Object.entries(p.s).map(([k,v])=>[svN(k),v]).filter(x=>x[0]);
+  if(cercaM)cercaM.remove();cercaM=L.layerGroup([L.circleMarker(f._ll,{radius:9,color:css('--sel'),weight:3,fill:false,interactive:false})]).addTo(map);
+  ficha.innerHTML='<div class="top"><div><div class="num cerca">Parada</div><div class="op">'+esc(p.n)+'<br><small>Código '+esc(p.c)+'</small></div></div><button class="close" id="cerrar" aria-label="Cerrar">×</button></div>'+
+   (sv.length?'<div class="hits"><small class="hl">Servicios que se detienen aquí</small>'+sv.map(([s,v])=>'<button class="hit" data-id="'+esc(s.id)+'" data-v="'+(v==='IR'?'':SENT[v])+'"><span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(odOf(s)||[...s.ops][0]||'')+'</span><span class="km">'+SENT[v]+'</span></button>').join('')+'</div>'
+   :'<p class="nada">Esta parada todavía no tiene servicios asociados.</p>')+
+   '<div class="sentidos"><button id="par-cerca">Ver servicios a menos de 2 km</button></div>';
+  ficha.hidden=false;document.getElementById('cerrar').onclick=clear;
+  document.getElementById('par-cerca').onclick=()=>cerca(f._ll,p.n);
+  ficha.querySelectorAll('.hit').forEach(b=>b.onclick=()=>select(b.dataset.id,b.dataset.v||null))}
+function parSel(s,v){if(selParL){selParL.remove();selParL=null}if(!PAR.features.length)return [];
+  const ks=v?[s.s+'|'+v]:[s.s+'|Ida',s.s+'|Regreso',s.s+'|'];const seen=new Set(),lst=[];
+  ks.forEach(k=>(PAR.orden[k]||[]).forEach(i=>{if(!seen.has(i)){seen.add(i);lst.push(i)}}));
+  if(!lst.length)return [];
+  selParL=L.layerGroup(lst.map(i=>{const f=PAR.features[i];const m=L.circleMarker(f._ll,{renderer:parR,radius:5.5,color:s.col,weight:2.5,fillColor:'#fff',fillOpacity:1});m.bindTooltip(esc(f.properties.n));m.on('click',e=>{L.DomEvent.stop(e);parada(i)});return m})).addTo(map);
+  return lst}
+
 
 window.POIVIS=1;poiVis();
 const leg=document.getElementById('leg');leg.innerHTML=BASE.per.features.map(f=>{const n=f.properties.nombre;return '<li><i style="border-color:'+PERCOL[f.properties.orden]+';background:'+PERCOL[f.properties.orden]+'22'+(n.includes('NO IMPLEMENTADO')?';border-style:dashed':'')+'"></i>'+cap(n)+'</li>'}).join('');
@@ -1011,6 +1040,10 @@ function render(){
   sd.open=!!t||!!fc||openSup[g.id]||(cur&&g.cats.includes(svcs[cur].c));sd.ontoggle=()=>{openSup[g.id]=sd.open};
   const sm=document.createElement('summary');sm.innerHTML='<span class="dots">'+g.cats.filter(c=>vis[c]).map(c=>'<i style="background:'+CATS[c].col+'"></i>').join('')+'</span>'+g.name+'<span class="n">'+gt+'</span>';
   sd.prepend(sm);list.appendChild(sd)});
+  if(t.length>=3&&window.PAR&&PAR.features.length){const pp=[];PAR.features.forEach((f,i)=>{if(norm(f.properties.n+' '+f.properties.c).includes(t))pp.push(i)});
+    if(pp.length){const d=document.createElement('details');d.className='cat';d.open=true;d.innerHTML='<summary><span class="dot" style="background:#fff;border:2px solid var(--ink)"></span>Paradas<span class="n">'+pp.length+'</span></summary>';
+      pp.slice(0,12).forEach(i=>{const f=PAR.features[i];const b=document.createElement('button');b.className='svc lugar';b.innerHTML='<span class="pin" aria-hidden="true"></span><span class="txt">'+esc(f.properties.n)+'<br><small>Código '+esc(f.properties.c)+' · '+Object.keys(f.properties.s).length+' servicios</small></span><span class="km">ver</span>';b.onclick=()=>{map.setView(f._ll,16);parada(i)};d.appendChild(b)});
+      list.prepend(d);total+=pp.length}}
   if(t.length>=3){const pl=[];POIS.loc.forEach(p=>{if(norm(p[2]).includes(t))pl.push([p,p[4]+' · '+p[3]+' · '+p[5]+' hab.'])});
     if(pl.length){const d=document.createElement('details');d.className='cat';d.open=true;d.innerHTML='<summary><span class="dot" style="background:var(--ink)"></span>Lugares<span class="n">'+pl.length+'</span></summary>';
       pl.slice(0,12).forEach(([p,sub])=>{const b=document.createElement('button');b.className='svc lugar';b.innerHTML='<span class="pin" aria-hidden="true"></span><span class="txt">'+esc(p[2])+'<br><small>'+esc(sub)+'</small></span><span class="km">ver</span>';b.onclick=()=>{map.setView([p[1],p[0]],13);cerca(L.latLng(p[1],p[0]),p[2])};d.appendChild(b)});
@@ -1034,6 +1067,7 @@ function select(id,v){
   showLines(id);halo(sel);
   const b=L.featureGroup(sel).getBounds();if(b.isValid())map.fitBounds(b,{padding:[40,40],maxZoom:14});
   const km=curVar?Math.max(...sel.map(l=>l._p.k||0)):kmOf(s);
+  parL.remove();const pl=parSel(s,sents.length?curVar:null);
   const C=CATS[s.c];
   const recs=[...new Set(sel.map(l=>l._p.r).filter(Boolean))];
   ficha.innerHTML='<div class="top"><div><div class="num" style="color:'+s.col+'">'+esc(s.s)+'</div>'+(recs.length===1?'<div class="rec">'+esc(recs[0])+'</div>':'')+'<div class="op">'+esc(C.full?C.name+' · '+C.full:C.name)+'</div></div><button class="close" id="cerrar" aria-label="Cerrar ficha">×</button></div>'+
@@ -1044,8 +1078,10 @@ function select(id,v){
      const ff=fs.filter(Boolean);const uq=new Set(ff.map(f=>coOf(f).join('|'))).size===1;const fl=uq?[ff[0]]:ff;
      return '<dt>'+lab+'</dt><dd class="co">'+fl.map(f=>(fl.length>1?'<small>'+esc(f.properties.r||variant(f.properties))+'</small><br>':'')+esc(coOf(f).join(' → '))).join('<br>')+'</dd>'})()+
    (sents.length?'<dt>Sentido</dt><dd>'+(curVar||sents.join(' y '))+'</dd>':(curVar?'<dt>Ruta</dt><dd>'+esc(curVar)+'</dd>':'<dt>Trazados</dt><dd>'+s.feats.length+'</dd>'))+
-   '<dt>Largo</dt><dd>'+km.toFixed(1)+' km</dd></dl>';
+   '<dt>Largo</dt><dd>'+km.toFixed(1)+' km</dd></dl>'+
+   (pl.length?'<details class="pars"><summary>Paradas'+(sents.length?(curVar?' ('+curVar.toLowerCase()+')':' (ida y regreso)'):'')+': '+pl.length+'</summary><ol>'+pl.map(i=>'<li><button data-i="'+i+'">'+esc(PAR.features[i].properties.n)+'</button></li>').join('')+'</ol></details>':'');
   ficha.hidden=false;
+  ficha.querySelectorAll('.pars button').forEach(b=>b.onclick=()=>{const f=PAR.features[+b.dataset.i];map.setView(f._ll,Math.max(map.getZoom(),16));f._m&&selParL&&selParL.eachLayer(m=>{if(m.getLatLng().equals(f._ll))m.openTooltip()})});
   document.getElementById('cerrar').onclick=clear;
   ficha.querySelectorAll('.sentidos button').forEach(bt=>bt.onclick=()=>select(id,bt.dataset.v==='Todos'?null:bt.dataset.v));
   render();
@@ -1055,7 +1091,7 @@ let cercaM=null;
 const R=2000;
 function distSeg(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1];let t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1);t=Math.max(0,Math.min(1,t));const x=a[0]+t*dx-p[0],y=a[1]+t*dy-p[1];return Math.sqrt(x*x+y*y)}
 function cerca(ll,titulo){
-  halo([]);
+  halo([]);if(selParL){selParL.remove();selParL=null}
   if(cur){cur=null;curVar=null;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})))}
   const kx=111320*Math.cos(ll.lat*Math.PI/180),ky=110540;const P=[ll.lng*kx,ll.lat*ky];
   const hits=[];
@@ -1084,7 +1120,7 @@ cpB.onclick=()=>capas(cpP.hidden);document.getElementById('capas-x').onclick=()=
 document.addEventListener('keydown',e=>{if(e.key==='Escape')capas(false)});
 L.DomEvent.disableClickPropagation(cpP);L.DomEvent.disableScrollPropagation(cpP);L.DomEvent.disableClickPropagation(cpB);document.getElementById('acerca-btn').onclick=()=>abrir('acerca');
 document.getElementById('ayuda-x').onclick=()=>dlg.close();
-function clear(){halo([]);if(cercaM){cercaM.remove();cercaM=null}cur=null;curVar=null;ficha.hidden=true;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})));render()}
+function clear(){halo([]);if(selParL){selParL.remove();selParL=null}setTimeout(()=>typeof parVis==='function'&&parVis());if(cercaM){cercaM.remove();cercaM=null}cur=null;curVar=null;ficha.hidden=true;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})));render()}
 map.on('click',e=>{if(!cpP.hidden){capas(false);return}if(cur||cercaM){clear();return}cerca(e.latlng,null)});
 const BASES={
   osm:{name:'Calles',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',o:{maxZoom:19,attribution:'© Esri, HERE, Garmin, OpenStreetMap'}},
