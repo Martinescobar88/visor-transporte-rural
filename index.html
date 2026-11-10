@@ -1042,9 +1042,12 @@ function render(){
       const l1=subsi?(p0.e||rec||od):(od||[rec,op].filter(Boolean).join(' · '));const extra=subsi?[l1!==od?od:'',p0.st].filter(Boolean).join(' · '):(od?[rec,op].filter(Boolean).join(' · '):'');
       b.innerHTML='<span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(l1)+'<br><small>'+(extra?esc(extra)+' · ':'')+s.feats.length+(s.feats.length===1?' trazado':' trazados')+'</small></span><span class="km">'+kmOf(s).toFixed(0)+' km</span>';
       b.onclick=()=>select(s.id,null);(subg?conts[key(s)]:d).appendChild(b);
-      const it=itsOf(s);if(it.length>1){const w=document.createElement('details');w.className='itl';w.open=cur===s.id;  // itinerarios desplegables bajo el servicio
-        w.innerHTML='<summary>'+it.length+' itinerarios</summary>'+it.map(x=>'<button class="'+(cur===s.id&&curIt===x?'on':'')+'" data-it="'+esc(x)+'">'+esc(x)+'</button>').join('');
-        w.querySelectorAll('button').forEach(bt=>bt.onclick=()=>select(s.id,cur===s.id?curVar:null,bt.dataset.it));(subg?conts[key(s)]:d).appendChild(w)}});
+      if(s.feats.length>1){const w=document.createElement('details');w.className='itl';w.open=cur===s.id;  // trazados desplegables bajo el servicio
+        const its=itsOf(s).length>1,sn=s.feats.some(f=>f.properties.d);
+        const tz=s.feats.map(f=>{const p=f.properties,it=its?itOf(p):'',v=sn?p.d:variant(p);return {it,v,lab:[it,v].filter(Boolean).join(' · ')}}).filter((x,i,a)=>a.findIndex(y=>y.lab===x.lab)===i)
+          .sort((x,y)=>x.lab.localeCompare(y.lab,'es',{numeric:true}));
+        w.innerHTML='<summary>Ver los '+s.feats.length+' trazados</summary>'+tz.map((x,i)=>'<button class="'+(cur===s.id&&(curIt||'')===x.it&&curVar===x.v?'on':'')+'" data-k="'+i+'">'+esc(x.lab)+'</button>').join('');
+        w.querySelectorAll('button').forEach(bt=>bt.onclick=()=>{const x=tz[+bt.dataset.k];select(s.id,x.v,x.it||null)});(subg?conts[key(s)]:d).appendChild(w)}});
     sd.appendChild(d)});
   if(!gt)return;
   sd.open=!!t||!!fc||openSup[g.id]||(cur&&g.cats.includes(svcs[cur].c));sd.ontoggle=()=>{openSup[g.id]=sd.open};
