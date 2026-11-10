@@ -911,7 +911,8 @@ main{position:relative;min-width:0;min-height:0}
 const CATMAP={'Rural corriente':'rc','Rural periférico':'rp','Perímetro Sur':'ps','Perímetro Surponiente':'pso','Electromovilidad':'em','CTA':'cta','CTR':'ctr','CTE':'cte'};
 let BASE,POIS,RUTAS;
 try{
-  const get=u=>fetch(u).then(r=>{if(!r.ok)throw new Error(u);return r.json()});
+  const DV='2026-11-10c';  // version de los datos: cambiarla al actualizar datos/ para que el navegador no use archivos antiguos
+  const get=u=>fetch(u+(u.includes('?')?'&':'?')+'v='+DV,{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error(u);return r.json()});
   const [rut,com,per,vias,loc]=await Promise.all(['rutas','comunas','perimetros','vias','localidades'].map(n=>get('datos/'+n+'.geojson')));
   window.PAR=await get('datos/paradas.geojson').catch(()=>({features:[],orden:{}}));
   BASE={com,per,vias};
@@ -985,7 +986,7 @@ function parada(i){const f=PAR.features[i],p=f.properties;clear();
   ficha.querySelectorAll('.hit').forEach(b=>b.onclick=()=>select(b.dataset.id,b.dataset.v||null))}
 function parSel(s,sel){if(selParL){selParL.remove();selParL=null}if(!PAR.features.length)return [];
   const seen=new Set(),lst=[];  // paradas de los trazados seleccionados (cada trazado tiene sus paradas por sentido y lado de la calle)
-  sel.forEach(l=>(PAR.orden[l._p.n]||[]).forEach(i=>{if(!seen.has(i)){seen.add(i);lst.push(i)}}));
+  sel.forEach(l=>(PAR.orden[l._p.n]||PAR.orden[l._p.s+'|'+l._p.d]||[]).forEach(i=>{if(!seen.has(i)){seen.add(i);lst.push(i)}}));
   PAR._sel=lst;if(!lst.length)return [];
   selParL=L.layerGroup(lst.map(i=>{const f=PAR.features[i];const m=L.circleMarker(f._ll,{renderer:parR,radius:5.5,color:s.col,weight:2.5,fillColor:'#fff',fillOpacity:1});m.bindTooltip(esc(f.properties.c));m.on('click',e=>{L.DomEvent.stop(e);parada(i)});return m})).addTo(map);
   return lst}
