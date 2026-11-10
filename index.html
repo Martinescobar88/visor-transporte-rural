@@ -832,6 +832,10 @@ main{position:relative;min-width:0;min-height:0}
 .hits .hl{color:var(--muted);padding:0 0 4px}.ficha .nada{padding:0 16px;color:var(--muted)}
 .ficha dd.co{max-height:160px;overflow:auto} .ficha dd.co small{font-weight:400;color:var(--muted)}
 .ficha .close{font:inherit;font-size:22px;line-height:1;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:4px 8px}
+.itl{margin:-4px 0 6px 52px;font-size:13px}.cat .itl summary{display:list-item;list-style:revert;cursor:pointer;color:var(--sel);font-weight:600;font-size:13px;padding:2px 0}.itl[open] summary{margin-bottom:4px}
+.itl button{font:inherit;margin:0 4px 4px 0;padding:4px 8px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}.itl button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+.pars li button{vertical-align:top}
+.its{padding:0 16px 10px}.its summary{cursor:pointer;font-weight:700;color:var(--sel);margin-bottom:6px}.its .sentidos{padding:0}
 .sentidos{display:flex;flex-wrap:wrap;gap:6px;padding:0 16px 14px;max-height:132px;overflow:auto}
 .sentidos button{flex:1 1 auto;white-space:nowrap;font:inherit;font-size:15px;padding:8px;border-radius:8px;border:2px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
 .sentidos button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
@@ -947,6 +951,8 @@ const svcs={};
 RUTAS.features.forEach(f=>{const p=f.properties;const k=p.c+'|'+p.s;
   const s=svcs[k]=svcs[k]||{id:k,c:p.c,s:p.s,ops:new Set(),zonas:new Set(),comunas:new Set(),cf:new Set(),feats:[]};
   if(p.o)s.ops.add(p.o);if(p.z)s.zonas.add(p.z);p.m.split(', ').filter(Boolean).forEach(c=>s.comunas.add(c));p.f.split(', ').filter(Boolean).forEach(c=>s.cf.add(c));s.feats.push(f)});
+const itOf=p=>{const m=/ITINERARIO[ _]*(\d+)/i.exec(p.n);return m?'Itinerario '+m[1]:''};
+const itsOf=s=>[...new Set(s.feats.map(f=>itOf(f.properties)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'es',{numeric:true}));
 const variant=(p)=>{let v=p.n.replace(p.s,'').replace(/^[\s|_]+/,'').replace(/_/g,' ').trim();return v||p.n};
 const groups={};Object.keys(CATS).forEach(c=>groups[c]=L.layerGroup().addTo(map));
 const baseW=c=>c==='cte'?2:2.6;
@@ -977,9 +983,9 @@ function parada(i){const f=PAR.features[i],p=f.properties;clear();
   ficha.hidden=false;document.getElementById('cerrar').onclick=clear;
   document.getElementById('par-cerca').onclick=()=>cerca(f._ll,p.n);
   ficha.querySelectorAll('.hit').forEach(b=>b.onclick=()=>select(b.dataset.id,b.dataset.v||null))}
-function parSel(s,v){if(selParL){selParL.remove();selParL=null}if(!PAR.features.length)return [];
-  const ks=v?[s.s+'|'+v]:[s.s+'|Ida',s.s+'|Regreso',s.s+'|'];const seen=new Set(),lst=[];
-  ks.forEach(k=>(PAR.orden[k]||[]).forEach(i=>{if(!seen.has(i)){seen.add(i);lst.push(i)}}));
+function parSel(s,sel){if(selParL){selParL.remove();selParL=null}if(!PAR.features.length)return [];
+  const seen=new Set(),lst=[];  // paradas de los trazados seleccionados (cada trazado tiene sus paradas por sentido y lado de la calle)
+  sel.forEach(l=>(PAR.orden[l._p.n]||[]).forEach(i=>{if(!seen.has(i)){seen.add(i);lst.push(i)}}));
   PAR._sel=lst;if(!lst.length)return [];
   selParL=L.layerGroup(lst.map(i=>{const f=PAR.features[i];const m=L.circleMarker(f._ll,{renderer:parR,radius:5.5,color:s.col,weight:2.5,fillColor:'#fff',fillOpacity:1});m.bindTooltip(esc(f.properties.c));m.on('click',e=>{L.DomEvent.stop(e);parada(i)});return m})).addTo(map);
   return lst}
@@ -1009,7 +1015,7 @@ const PB=L.Control.extend({options:{position:'topleft'},onAdd(){const b=L.DomUti
 map.zoomControl.setPosition('topleft');new PB().addTo(map);
 // lista
 const list=document.getElementById('list'),q=document.getElementById('q');
-let cur=null,curVar=null;const openCat={};
+let cur=null,curVar=null,curIt=null;const openCat={};
 const norm=t=>(t||'').toString().normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
 const esc=t=>String(t).replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
 const idaF=s=>s.feats.find(f=>f.properties.d==='Ida')||s.feats[0];
@@ -1035,7 +1041,10 @@ function render(){
       const op=subg&&porOp?'':[...s.ops][0];const rs=[...new Set(s.feats.map(f=>f.properties.r))];const rec=rs.length===1?rs[0]:'';const od=odOf(s);const p0=s.feats[0].properties;const subsi=['cta','ctr','cte'].includes(s.c);
       const l1=subsi?(p0.e||rec||od):(od||[rec,op].filter(Boolean).join(' · '));const extra=subsi?[l1!==od?od:'',p0.st].filter(Boolean).join(' · '):(od?[rec,op].filter(Boolean).join(' · '):'');
       b.innerHTML='<span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(l1)+'<br><small>'+(extra?esc(extra)+' · ':'')+s.feats.length+(s.feats.length===1?' trazado':' trazados')+'</small></span><span class="km">'+kmOf(s).toFixed(0)+' km</span>';
-      b.onclick=()=>select(s.id,null);(subg?conts[key(s)]:d).appendChild(b)});
+      b.onclick=()=>select(s.id,null);(subg?conts[key(s)]:d).appendChild(b);
+      const it=itsOf(s);if(it.length>1){const w=document.createElement('details');w.className='itl';w.open=cur===s.id;  // itinerarios desplegables bajo el servicio
+        w.innerHTML='<summary>'+it.length+' itinerarios</summary>'+it.map(x=>'<button class="'+(cur===s.id&&curIt===x?'on':'')+'" data-it="'+esc(x)+'">'+esc(x)+'</button>').join('');
+        w.querySelectorAll('button').forEach(bt=>bt.onclick=()=>select(s.id,cur===s.id?curVar:null,bt.dataset.it));(subg?conts[key(s)]:d).appendChild(w)}});
     sd.appendChild(d)});
   if(!gt)return;
   sd.open=!!t||!!fc||openSup[g.id]||(cur&&g.cats.includes(svcs[cur].c));sd.ontoggle=()=>{openSup[g.id]=sd.open};
@@ -1057,34 +1066,37 @@ let haloL=null;
 function halo(ls){if(haloL){haloL.remove();haloL=null}if(!ls.length){showLines(null);return}
   haloL=L.layerGroup(ls.map(l=>L.geoJSON(l.toGeoJSON(),{interactive:false,style:{renderer:rend.rut,color:css('--panel'),weight:11,opacity:.95,lineCap:'round',lineJoin:'round'}}))).addTo(map);
   ls.forEach(l=>l.bringToFront())}
-function select(id,v){
+function select(id,v,it){
   const s=svcs[id];cur=id;if(cercaM){cercaM.remove();cercaM=null}
   const sents=[...new Set(s.feats.map(f=>f.properties.d).filter(Boolean))];
+  const its=itsOf(s);curIt=its.length>1&&it&&its.includes(it)?it:null;const F=curIt?s.feats.filter(f=>itOf(f.properties)===curIt):s.feats;
   const vars=sents.length?sents:(s.feats.length>1&&s.feats.length<=8?s.feats.map(f=>variant(f.properties)):[]);
   curVar=v;
-  const match=l=>!curVar||(sents.length?l._p.d===curVar:variant(l._p)===curVar);
+  const match=l=>(!curIt||itOf(l._p)===curIt)&&(!curVar||(sents.length?l._p.d===curVar:variant(l._p)===curVar));
   Object.values(svcs).forEach(o=>o.lines.forEach(l=>{const on=o.id===id&&match(l);l.setStyle(o.id===id?{opacity:on?1:.35,weight:on?6:3}:{opacity:.05,weight:1.5})}));
   const sel=s.lines.filter(match);
   showLines(id);halo(sel);
   const b=L.featureGroup(sel).getBounds();if(b.isValid())map.fitBounds(b,{padding:[40,40],maxZoom:14});
-  const km=curVar?Math.max(...sel.map(l=>l._p.k||0)):kmOf(s);
-  parL.remove();const pl=parSel(s,sents.length?curVar:null);
+  const km=curVar||curIt?Math.max(...sel.map(l=>l._p.k||0)):kmOf(s);
+  parL.remove();const pl=parSel(s,sel);
   const C=CATS[s.c];
   const recs=[...new Set(sel.map(l=>l._p.r).filter(Boolean))];
   ficha.innerHTML='<div class="top"><div><div class="num" style="color:'+s.col+'">'+esc(s.s)+'</div>'+(recs.length===1?'<div class="rec">'+esc(recs[0])+'</div>':'')+'<div class="op">'+esc(C.full?C.name+' · '+C.full:C.name)+'</div></div><button class="close" id="cerrar" aria-label="Cerrar ficha">×</button></div>'+
+   (its.length>1?'<details class="its" open><summary>Itinerarios: '+its.length+(curIt?' · '+esc(curIt):'')+'</summary><div class="sentidos">'+['Todos'].concat(its).map(x=>'<button aria-pressed="'+((x==='Todos'&&!curIt)||x===curIt)+'" data-it="'+esc(x)+'">'+esc(x.replace('Itinerario ','It. '))+'</button>').join('')+'</div></details>':'')+
    (vars.length>1?'<div class="sentidos">'+['Todos'].concat(vars).map(x=>'<button aria-pressed="'+((x==='Todos'&&!curVar)||x===curVar)+'" data-v="'+esc(x)+'">'+esc(x)+'</button>').join('')+'</div>':'')+
    '<dl>'+(s.feats[0].properties.e?'<dt>Establecimiento</dt><dd>'+esc(s.feats[0].properties.e).replace(/ \/ /g,'<br>')+'</dd>':'')+(s.feats[0].properties.fo?'<dt>Folio servicio</dt><dd>'+esc(s.feats[0].properties.fo)+'</dd>':'')+(s.feats[0].properties.st?'<dt>Estado</dt><dd>'+esc(s.feats[0].properties.st)+'</dd>':'')+(s.ops.size?'<dt>Operador</dt><dd>'+esc([...s.ops].join(', '))+'</dd>':'')+
-   (()=>{const fs=sents.length?[curVar?s.feats.find(f=>f.properties.d===curVar):idaF(s)]:curVar?[s.feats.find(f=>variant(f.properties)===curVar)]:s.feats.length===1||!vars.length?[s.feats[0]]:s.feats;
+   (()=>{const fs=sents.length?[curVar?F.find(f=>f.properties.d===curVar):(F.find(f=>f.properties.d==='Ida')||F[0])]:curVar?[s.feats.find(f=>variant(f.properties)===curVar)]:s.feats.length===1||!vars.length?[s.feats[0]]:s.feats;
      const lab=sents.length?(curVar==='Regreso'?'Comunas (regreso)':'Comunas (ida)'):'Comunas';
      const ff=fs.filter(Boolean);const uq=new Set(ff.map(f=>coOf(f).join('|'))).size===1;const fl=uq?[ff[0]]:ff;
      return '<dt>'+lab+'</dt><dd class="co">'+fl.map(f=>(fl.length>1?'<small>'+esc(f.properties.r||variant(f.properties))+'</small><br>':'')+esc(coOf(f).join(' → '))).join('<br>')+'</dd>'})()+
-   (sents.length?'<dt>Sentido</dt><dd>'+(curVar||sents.join(' y '))+'</dd>':(curVar?'<dt>Ruta</dt><dd>'+esc(curVar)+'</dd>':'<dt>Trazados</dt><dd>'+s.feats.length+'</dd>'))+
+   (curIt?'<dt>Itinerario</dt><dd>'+esc(curIt)+' de '+its.length+'</dd>':'')+(sents.length?'<dt>Sentido</dt><dd>'+(curVar||sents.join(' y '))+'</dd>':(curVar?'<dt>Ruta</dt><dd>'+esc(curVar)+'</dd>':'<dt>Trazados</dt><dd>'+s.feats.length+'</dd>'))+
    '<dt>Largo</dt><dd>'+km.toFixed(1)+' km</dd></dl>'+
-   (pl.length?'<details class="pars"><summary>Paradas'+(sents.length?(curVar?' ('+curVar.toLowerCase()+')':' (ida y regreso)'):'')+': '+pl.length+'</summary><ol>'+pl.map(i=>'<li><button data-i="'+i+'">'+esc(PAR.features[i].properties.n)+'</button></li>').join('')+'</ol></details>':'');
+   (pl.length?'<details class="pars"><summary>Paradas'+(sents.length?(curVar?' ('+curVar.toLowerCase()+')':' (ida y regreso)'):'')+': '+pl.length+'</summary><ol>'+pl.map(i=>'<li><button data-i="'+i+'"><b>'+esc(PAR.features[i].properties.c)+'</b> '+esc(PAR.features[i].properties.n)+'</button></li>').join('')+'</ol></details>':'');
   ficha.hidden=false;
   ficha.querySelectorAll('.pars button').forEach(b=>b.onclick=()=>{const f=PAR.features[+b.dataset.i];map.setView(f._ll,Math.max(map.getZoom(),16));f._m&&selParL&&selParL.eachLayer(m=>{if(m.getLatLng().equals(f._ll))m.openTooltip()})});
   document.getElementById('cerrar').onclick=clear;
-  ficha.querySelectorAll('.sentidos button').forEach(bt=>bt.onclick=()=>select(id,bt.dataset.v==='Todos'?null:bt.dataset.v));
+  ficha.querySelectorAll('.sentidos button[data-v]').forEach(bt=>bt.onclick=()=>select(id,bt.dataset.v==='Todos'?null:bt.dataset.v,curIt));
+  ficha.querySelectorAll('.sentidos button[data-it]').forEach(bt=>bt.onclick=()=>select(id,curVar,bt.dataset.it==='Todos'?null:bt.dataset.it));
   render();
   const el=document.getElementById('svc-'+id.replace('|','-'));if(el)el.scrollIntoView({block:'nearest'});
 }
@@ -1093,7 +1105,7 @@ const R=2000;
 function distSeg(p,a,b){const dx=b[0]-a[0],dy=b[1]-a[1];let t=((p[0]-a[0])*dx+(p[1]-a[1])*dy)/(dx*dx+dy*dy||1);t=Math.max(0,Math.min(1,t));const x=a[0]+t*dx-p[0],y=a[1]+t*dy-p[1];return Math.sqrt(x*x+y*y)}
 function cerca(ll,titulo){
   halo([]);if(selParL){selParL.remove();selParL=null}
-  if(cur){cur=null;curVar=null;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})))}
+  if(cur){cur=null;curVar=null;curIt=null;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})))}
   const kx=111320*Math.cos(ll.lat*Math.PI/180),ky=110540;const P=[ll.lng*kx,ll.lat*ky];
   const hits=[];
   Object.values(svcs).forEach(s=>{if(!vis[s.c]||!inF(s))return;let best=1e9;
@@ -1121,7 +1133,7 @@ cpB.onclick=()=>capas(cpP.hidden);document.getElementById('capas-x').onclick=()=
 document.addEventListener('keydown',e=>{if(e.key==='Escape')capas(false)});
 L.DomEvent.disableClickPropagation(cpP);L.DomEvent.disableScrollPropagation(cpP);L.DomEvent.disableClickPropagation(cpB);document.getElementById('acerca-btn').onclick=()=>abrir('acerca');
 document.getElementById('ayuda-x').onclick=()=>dlg.close();
-function clear(){halo([]);if(selParL){selParL.remove();selParL=null}setTimeout(()=>typeof parVis==='function'&&parVis());if(cercaM){cercaM.remove();cercaM=null}cur=null;curVar=null;ficha.hidden=true;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})));render()}
+function clear(){halo([]);if(selParL){selParL.remove();selParL=null}setTimeout(()=>typeof parVis==='function'&&parVis());if(cercaM){cercaM.remove();cercaM=null}cur=null;curVar=null;curIt=null;ficha.hidden=true;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})));render()}
 const parCerca=pt=>{if(!vis.par||!PAR.features.length||map.getZoom()<PAR_ZOOM)return -1;let bi=-1,bd=24;const vis_=selParL?new Set(PAR._sel):null;PAR.features.forEach((f,i)=>{if(cur&&!(vis_&&vis_.has(i)))return;const d0=map.latLngToContainerPoint(f._ll).distanceTo(pt);if(d0>=24)return;const d=d0-(Object.keys(f.properties.s).length?8:0);if(d<bd){bd=d;bi=i}});return bi};
 map.on('click',e=>{if(!cpP.hidden){capas(false);return}const pi=parCerca(e.containerPoint);if(pi>=0){parada(pi);return}if(cur||cercaM){clear();return}cerca(e.latlng,null)});
 const BASES={
