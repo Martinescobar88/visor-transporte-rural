@@ -921,6 +921,7 @@ const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim
 const cap=n=>(n.charAt(0)+n.slice(1).toLowerCase()).replace('ds212','DS212');
 const tc=n=>n.toLowerCase().replace(/(^|\s)\S/g,m=>m.toUpperCase()).replace(/ (De|Del) /g,m=>m.toLowerCase());
 const map=L.map('map',{zoomControl:true,preferCanvas:true}).setView([-33.5,-70.75],9);
+window.visorMap=map;
 map.attributionControl.setPrefix('Leaflet');
 const mapEl=document.getElementById('map');
 map.createPane('pCom').style.zIndex=200;map.createPane('pPer').style.zIndex=250;map.createPane('pVia').style.zIndex=300;
@@ -959,10 +960,10 @@ const lr=document.getElementById('layers-rutas'),lc=document.getElementById('lay
 SUP.forEach(g=>{const h=document.createElement('span');h.className='gl';h.textContent=g.name;lr.appendChild(h);const w=document.createElement('div');w.className='layers';lr.appendChild(w);g.cats.forEach(k=>mk(k,CATS[k].name,CATS[k].col,0,w))});
 mk('vias','Vías estructurantes','#5c625f',0,lc);mk('per','Perímetros','#2563eb',1,lc);mk('com','Comunas','#7f948e',1,lc);if(PAR.features.length)mk('par','Paradas','#fff',2,lc);
 // paradas
-const PAR_ZOOM=13,parR=L.canvas({padding:.3}),parL=L.layerGroup();let selParL=null;
+const PAR_ZOOM=13;map.createPane('pPar').style.zIndex=450;const parR=L.canvas({pane:'pPar',padding:.3,tolerance:10}),parL=L.layerGroup();let selParL=null;
 const svN=s=>Object.values(svcs).find(o=>o.s===s);
 PAR.features.forEach((f,i)=>{const [x,y]=f.geometry.coordinates;f._ll=L.latLng(y,x);const m=L.circleMarker(f._ll,{renderer:parR,radius:4.5,color:css('--ink'),weight:1.5,fillColor:'#fff',fillOpacity:1});
-  m.bindTooltip(String(f.properties.n).replace(/[<>&]/g,''));m.on('click',e=>{L.DomEvent.stop(e);parada(i)});m.addTo(parL);f._m=m});
+  m.bindTooltip(String(f.properties.n).replace(/[<>&]/g,''));m.addTo(parL);f._m=m});  // el toque lo resuelve el clic del mapa (parCerca), que prefiere paradas con servicios
 const parVis=()=>{(vis.par&&map.getZoom()>=PAR_ZOOM&&!cur)?parL.addTo(map):parL.remove()};map.on('zoomend',parVis);
 extra.par={addTo:()=>parVis(),remove:()=>parL.remove()};parVis();
 const SENT={I:'Ida',R:'Regreso',IR:'Ida y regreso'};
@@ -979,7 +980,7 @@ function parada(i){const f=PAR.features[i],p=f.properties;clear();
 function parSel(s,v){if(selParL){selParL.remove();selParL=null}if(!PAR.features.length)return [];
   const ks=v?[s.s+'|'+v]:[s.s+'|Ida',s.s+'|Regreso',s.s+'|'];const seen=new Set(),lst=[];
   ks.forEach(k=>(PAR.orden[k]||[]).forEach(i=>{if(!seen.has(i)){seen.add(i);lst.push(i)}}));
-  if(!lst.length)return [];
+  PAR._sel=lst;if(!lst.length)return [];
   selParL=L.layerGroup(lst.map(i=>{const f=PAR.features[i];const m=L.circleMarker(f._ll,{renderer:parR,radius:5.5,color:s.col,weight:2.5,fillColor:'#fff',fillOpacity:1});m.bindTooltip(esc(f.properties.n));m.on('click',e=>{L.DomEvent.stop(e);parada(i)});return m})).addTo(map);
   return lst}
 
@@ -1121,7 +1122,8 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')capas(false)});
 L.DomEvent.disableClickPropagation(cpP);L.DomEvent.disableScrollPropagation(cpP);L.DomEvent.disableClickPropagation(cpB);document.getElementById('acerca-btn').onclick=()=>abrir('acerca');
 document.getElementById('ayuda-x').onclick=()=>dlg.close();
 function clear(){halo([]);if(selParL){selParL.remove();selParL=null}setTimeout(()=>typeof parVis==='function'&&parVis());if(cercaM){cercaM.remove();cercaM=null}cur=null;curVar=null;ficha.hidden=true;Object.values(svcs).forEach(o=>o.lines.forEach(l=>l.setStyle({opacity:.85,weight:baseW(o.c)})));render()}
-map.on('click',e=>{if(!cpP.hidden){capas(false);return}if(cur||cercaM){clear();return}cerca(e.latlng,null)});
+const parCerca=pt=>{if(!vis.par||!PAR.features.length||map.getZoom()<PAR_ZOOM)return -1;let bi=-1,bd=24;const vis_=selParL?new Set(PAR._sel):null;PAR.features.forEach((f,i)=>{if(cur&&!(vis_&&vis_.has(i)))return;const d0=map.latLngToContainerPoint(f._ll).distanceTo(pt);if(d0>=24)return;const d=d0-(Object.keys(f.properties.s).length?8:0);if(d<bd){bd=d;bi=i}});return bi};
+map.on('click',e=>{if(!cpP.hidden){capas(false);return}const pi=parCerca(e.containerPoint);if(pi>=0){parada(pi);return}if(cur||cercaM){clear();return}cerca(e.latlng,null)});
 const BASES={
   osm:{name:'Calles',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',o:{maxZoom:19,attribution:'© Esri, HERE, Garmin, OpenStreetMap'}},
   sat:{name:'Satélite',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',o:{maxZoom:19,attribution:'Imágenes © Esri, Maxar, Earthstar Geographics'}},
