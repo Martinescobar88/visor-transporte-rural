@@ -963,7 +963,7 @@ mk('vias','Vías estructurantes','#5c625f',0,lc);mk('per','Perímetros','#2563eb
 const PAR_ZOOM=13;map.createPane('pPar').style.zIndex=450;const parR=L.canvas({pane:'pPar',padding:.3,tolerance:10}),parL=L.layerGroup();let selParL=null;
 const svN=s=>Object.values(svcs).find(o=>o.s===s);
 PAR.features.forEach((f,i)=>{const [x,y]=f.geometry.coordinates;f._ll=L.latLng(y,x);const m=L.circleMarker(f._ll,{renderer:parR,radius:4.5,color:css('--ink'),weight:1.5,fillColor:'#fff',fillOpacity:1});
-  m.bindTooltip(String(f.properties.n).replace(/[<>&]/g,''));m.addTo(parL);f._m=m});  // el toque lo resuelve el clic del mapa (parCerca), que prefiere paradas con servicios
+  m.bindTooltip(String(f.properties.c).replace(/[<>&]/g,''));m.addTo(parL);f._m=m});  // el toque lo resuelve el clic del mapa (parCerca), que prefiere paradas con servicios
 const parVis=()=>{(vis.par&&map.getZoom()>=PAR_ZOOM&&!cur)?parL.addTo(map):parL.remove()};map.on('zoomend',parVis);
 extra.par={addTo:()=>parVis(),remove:()=>parL.remove()};parVis();
 const SENT={I:'Ida',R:'Regreso',IR:'Ida y regreso'};
@@ -971,7 +971,7 @@ function parada(i){const f=PAR.features[i],p=f.properties;clear();
   const sv=Object.entries(p.s).map(([k,v])=>[svN(k),v]).filter(x=>x[0]);
   if(cercaM)cercaM.remove();cercaM=L.layerGroup([L.circleMarker(f._ll,{radius:9,color:css('--sel'),weight:3,fill:false,interactive:false})]).addTo(map);
   ficha.innerHTML='<div class="top"><div><div class="num cerca">Parada</div><div class="op">'+esc(p.n)+'<br><small>Código '+esc(p.c)+'</small></div></div><button class="close" id="cerrar" aria-label="Cerrar">×</button></div>'+
-   (sv.length?'<div class="hits"><small class="hl">Servicios que se detienen aquí</small>'+sv.map(([s,v])=>'<button class="hit" data-id="'+esc(s.id)+'" data-v="'+(v==='IR'?'':SENT[v])+'"><span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(odOf(s)||[...s.ops][0]||'')+'</span><span class="km">'+SENT[v]+'</span></button>').join('')+'</div>'
+   (sv.length?'<div class="hits"><small class="hl">'+(p.x?'Servicios que pasan por aquí (a menos de 50 m, sin dato oficial de detención)':'Servicios que se detienen aquí')+'</small>'+sv.map(([s,v])=>'<button class="hit" data-id="'+esc(s.id)+'" data-v="'+(v==='IR'?'':SENT[v])+'"><span class="badge" style="background:'+s.col+'">'+esc(s.s)+'</span><span class="txt">'+esc(odOf(s)||[...s.ops][0]||'')+'</span><span class="km">'+SENT[v]+'</span></button>').join('')+'</div>'
    :'<p class="nada">Esta parada todavía no tiene servicios asociados.</p>')+
    '<div class="sentidos"><button id="par-cerca">Ver servicios a menos de 2 km</button></div>';
   ficha.hidden=false;document.getElementById('cerrar').onclick=clear;
@@ -981,7 +981,7 @@ function parSel(s,v){if(selParL){selParL.remove();selParL=null}if(!PAR.features.
   const ks=v?[s.s+'|'+v]:[s.s+'|Ida',s.s+'|Regreso',s.s+'|'];const seen=new Set(),lst=[];
   ks.forEach(k=>(PAR.orden[k]||[]).forEach(i=>{if(!seen.has(i)){seen.add(i);lst.push(i)}}));
   PAR._sel=lst;if(!lst.length)return [];
-  selParL=L.layerGroup(lst.map(i=>{const f=PAR.features[i];const m=L.circleMarker(f._ll,{renderer:parR,radius:5.5,color:s.col,weight:2.5,fillColor:'#fff',fillOpacity:1});m.bindTooltip(esc(f.properties.n));m.on('click',e=>{L.DomEvent.stop(e);parada(i)});return m})).addTo(map);
+  selParL=L.layerGroup(lst.map(i=>{const f=PAR.features[i];const m=L.circleMarker(f._ll,{renderer:parR,radius:5.5,color:s.col,weight:2.5,fillColor:'#fff',fillOpacity:1});m.bindTooltip(esc(f.properties.c));m.on('click',e=>{L.DomEvent.stop(e);parada(i)});return m})).addTo(map);
   return lst}
 
 
